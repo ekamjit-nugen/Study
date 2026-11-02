@@ -5,6 +5,8 @@ import LessonPlayer from "./components/LessonPlayer";
 import { useLocal } from "./lib/useLocal";
 import { CheatSheet, CourseHome, HardProblems, Home, InterviewBank, Playground } from "./components/Pages";
 import { MissionPage, ProjectHome } from "./components/Project";
+import { NotesBar, NotesPage } from "./components/NotesBar";
+import ChapterSummary from "./components/ChapterSummary";
 import { findCourse } from "./courses/registry";
 import { useRoute } from "./lib/route";
 
@@ -34,6 +36,11 @@ export default function App() {
   else if (route.page === "cheatsheet") body = <CheatSheet />;
   else if (route.page === "project") body = <ProjectHome />;
   else if (route.page === "mission") body = <MissionPage key={route.id} id={route.id} />;
+  else if (route.page === "notes") body = <NotesPage />;
+  else if (route.page === "chapter") {
+    const course = findCourse(route.course);
+    body = course ? <ChapterSummary key={route.moduleId} course={course} moduleId={route.moduleId} /> : <div className="content"><h1>Not found</h1></div>;
+  }
   else {
     const course = findCourse(route.course);
     if (!course) body = <div className="content"><h1>Not found</h1><a href="#/">Home</a></div>;
@@ -59,10 +66,7 @@ export default function App() {
     <div className="app">
       <Sidebar route={route} open={open} onClose={() => setOpen(false)} theme={theme} setTheme={setTheme} />
       <main className="main">
-        <div className="topbar">
-          <button className="btn small" onClick={() => setOpen(true)}>☰ Courses</button>
-          <a href="#/" style={{ fontWeight: 700, color: "inherit" }}>Full-Stack Mastery</a>
-        </div>
+        <NotesBar onMenu={() => setOpen(true)} />
         {body}
       </main>
     </div>

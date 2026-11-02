@@ -11,6 +11,9 @@ import { interviewAnswer, interviewQuestion, interviewTag } from "./InterviewCar
 import { Ladder, Visual, splitBullet } from "./Visuals";
 import { QuizCard } from "./QuizCard";
 import { useLastTopic } from "../lib/learner";
+import { NoteCtx, type NoteContext } from "../lib/notes";
+import { Notable } from "./Notable";
+import { chapterHref } from "./ChapterSummary";
 
 type Kind = "start" | "idea" | "try" | "quiz" | "problem" | "practice" | "interview" | "finish";
 type Step = { kind: Kind; label: string; title: string; lead?: string; body: ReactNode };
@@ -55,14 +58,18 @@ function AnalogyBox({ s }: { s: Section }) {
   return (
     <div className="analogy">
       {s.analogy && (
-        <div className="analogy-line">
-          <span className="analogy-tag">Think of it like</span> {inline(s.analogy)}
-        </div>
+        <Notable text={s.analogy} where={"Think of it like · " + s.title} block>
+          <div className="analogy-line">
+            <span className="analogy-tag">Think of it like</span> {inline(s.analogy)}
+          </div>
+        </Notable>
       )}
       {s.why && (
-        <div className="analogy-line why">
-          <span className="analogy-tag">Why you care</span> {inline(s.why)}
-        </div>
+        <Notable text={s.why} where={"Why you care · " + s.title} block>
+          <div className="analogy-line why">
+            <span className="analogy-tag">Why you care</span> {inline(s.why)}
+          </div>
+        </Notable>
       )}
     </div>
   );
@@ -243,7 +250,7 @@ function quizStep(q: Quiz, i: number, total: number, chosen: number | null, onCh
 
 type QuizState = Record<number, number>;
 
-export function buildSteps(topic: Topic, courseId: string, next: Topic | undefined, onDone: (() => void) | undefined, done: boolean | undefined, quizState: QuizState, setQuiz: (i: number, c: number) => void): Step[] {
+export function buildSteps(topic: Topic, courseId: string, next: Topic | undefined, onDone: (() => void) | undefined, done: boolean | undefined, quizState: QuizState, setQuiz: (i: number, c: number) => void, chapterLink?: { href: string; title: string }): Step[] {
   const id = `${courseId}/${topic.slug}`;
   const steps: Step[] = [];
   steps.push({
@@ -255,12 +262,14 @@ export function buildSteps(topic: Topic, courseId: string, next: Topic | undefin
       <>
         <div className="tldr-cards">
           {topic.tldr.map((t, i) => (
-            <div className="vbox tone-accent" key={i}>
-              <div className="vsub" style={{ marginBottom: 2 }}>
-                in 30 seconds · {i + 1}
+            <Notable key={i} text={t} where="In 30 seconds" block>
+              <div className="vbox tone-accent">
+                <div className="vsub" style={{ marginBottom: 2 }}>
+                  in 30 seconds · {i + 1}
+                </div>
+                {inline(t)}
               </div>
-              {inline(t)}
-            </div>
+            </Notable>
           ))}
         </div>
         {topic.words && (
@@ -291,19 +300,25 @@ export function buildSteps(topic: Topic, courseId: string, next: Topic | undefin
       <>
         <div className="tldr-cards">
           {topic.remember.map((r, i) => (
-            <div className="vbox tone-ok" key={i}>
-              {inline(r)}
-            </div>
+            <Notable key={i} text={r} where="Remember" block>
+              <div className="vbox tone-ok">{inline(r)}</div>
+            </Notable>
           ))}
         </div>
         <div className="row" style={{ marginTop: "1rem" }}>
           <button className={`btn ${done ? "ok" : "primary"}`} onClick={onDone}>
             {done ? "✓ Done — click to undo" : "Mark as done"}
           </button>
-          {next && (
-            <a className="btn" href={href.topic(courseId, next.slug)}>
-              Next topic: {next.title} →
+          {chapterLink ? (
+            <a className="btn" href={chapterLink.href}>
+              📋 Chapter summary: {chapterLink.title} →
             </a>
+          ) : (
+            next && (
+              <a className="btn" href={href.topic(courseId, next.slug)}>
+                Next topic: {next.title} →
+              </a>
+            )
           )}
         </div>
       </>
@@ -319,10 +334,14 @@ export default function LessonPlayer({ course, module, topic, prev, next, onPage
   const [quizState, setQuizState] = useLocal<QuizState>(`fsm-quiz-${id}`, {});
   const [, setLast] = useLastTopic();
   useEffect(() => setLast({ course: course.id, slug: topic.slug, title: topic.title }), [course.id, topic.slug, topic.title]); // eslint-disable-line react-hooks/exhaustive-deps
+  const isLastInModule = module.topics[module.topics.length - 1]?.slug === topic.slug;
+  const chapterLink = isLastInModule ? { href: chapterHref(course.id, module.id), title: module.title } : undefined;
   const steps = useMemo(
-    () => buildSteps(topic, course.id, next, () => toggle(id), done, quizState, (i, c) => setQuizState({ ...quizState, [i]: c })),
-    [topic, course.id, next, done, quizState], // eslint-disable-line react-hooks/exhaustive-deps
+    () => buildSteps(topic, course.id, next, () => toggle(id), done, quizState, (i, c) => setQuizState({ ...quizState, [i]: c }), chapterLink),
+    [topic, course.id, next, done, quizState, isLastInModule], // eslint-disable-line react-hooks/exhaustive-deps
   );
+  const mi = course.modules.findIndex((m) => m.id === module.id);
+  const noteCtx: NoteContext = { courseId: course.id, courseTitle: course.title, moduleId: module.id, moduleTitle: `${mi + 1}. ${module.title}`, topicSlug: topic.slug, topicTitle: topic.title, href: href.topic(course.id, topic.slug) };
   const [saved, setSaved] = useLocal<number>(`fsm-step-${id}`, 0);
   const [i, setI] = useState(Math.min(saved, steps.length - 1));
   const [showMap, setShowMap] = useState(false);
@@ -346,6 +365,7 @@ export default function LessonPlayer({ course, module, topic, prev, next, onPage
   const step = steps[i];
   const pct = Math.round(((i + 1) / steps.length) * 100);
   return (
+    <NoteCtx.Provider value={noteCtx}>
     <div className="content player">
       <div className="row" style={{ justifyContent: "space-between" }}>
         <div className="small muted">
@@ -395,6 +415,10 @@ export default function LessonPlayer({ course, module, topic, prev, next, onPage
           <button className="btn primary" onClick={() => go(i + 1)}>
             Next →
           </button>
+        ) : chapterLink ? (
+          <a className="btn primary" href={chapterLink.href}>
+            Chapter summary →
+          </a>
         ) : next ? (
           <a className="btn primary" href={href.topic(course.id, next.slug)}>
             Next topic →
@@ -410,5 +434,6 @@ export default function LessonPlayer({ course, module, topic, prev, next, onPage
         <span>{next && <a href={href.topic(course.id, next.slug)}>{next.title} →</a>}</span>
       </div>
     </div>
+    </NoteCtx.Provider>
   );
 }

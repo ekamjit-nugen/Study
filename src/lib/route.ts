@@ -9,7 +9,9 @@ export type Route =
   | { page: "playground" }
   | { page: "cheatsheet" }
   | { page: "project" }
-  | { page: "mission"; id: string };
+  | { page: "mission"; id: string }
+  | { page: "notes" }
+  | { page: "chapter"; course: string; moduleId: string };
 
 export function parseHash(hash: string): Route {
   const parts = hash.replace(/^#\/?/, "").split("/").filter(Boolean);
@@ -19,6 +21,8 @@ export function parseHash(hash: string): Route {
   if (parts[0] === "playground") return { page: "playground" };
   if (parts[0] === "cheatsheet") return { page: "cheatsheet" };
   if (parts[0] === "project") return parts[1] ? { page: "mission", id: parts[1] } : { page: "project" };
+  if (parts[0] === "notes") return { page: "notes" };
+  if (parts.length === 3 && parts[1] === "chapter") return { page: "chapter", course: parts[0], moduleId: parts[2] };
   if (parts.length === 1) return { page: "course", course: parts[0] };
   return { page: "topic", course: parts[0], slug: parts[1] };
 }
@@ -41,5 +45,6 @@ export const href = {
   course: (c: string) => `#/${c}`,
   topic: (c: string, slug: string) => `#/${c}/${slug}`,
   project: () => "#/project",
+  chapter: (c: string, m: string) => `#/${c}/chapter/${m}`,
   mission: (id: string) => `#/project/${id}`,
 };

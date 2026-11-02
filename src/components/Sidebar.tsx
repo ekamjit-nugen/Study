@@ -80,6 +80,10 @@ export default function Sidebar({ route, open, onClose, theme, setTheme }: { rou
                     </a>
                   );
                 })}
+                <a href={href.chapter(course.id, m.id)} className={`side-topic summary ${route.page === "chapter" && route.moduleId === m.id ? "active" : ""}`} onClick={onClose}>
+                  <span className="num">📋</span>
+                  <span>Chapter summary & practice</span>
+                </a>
               </div>
             ))}
           </div>

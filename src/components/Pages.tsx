@@ -118,6 +118,9 @@ export function CourseHome({ course }: { course: Course }) {
             {mi + 1}. {m.title}
           </h3>
           <p className="small muted">{m.simple}</p>
+          <a className="btn small" href={href.chapter(course.id, m.id)} style={{ marginBottom: "0.5rem" }}>
+            📋 Chapter summary & practical questions
+          </a>
           <ul style={{ listStyle: "none", paddingLeft: 0 }}>
             {m.topics.map((t, ti) => (
               <li key={t.slug}>
