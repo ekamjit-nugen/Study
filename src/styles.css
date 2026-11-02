@@ -317,7 +317,8 @@ details.more > div { margin-top: 0.5rem; padding: 0.6rem 0.9rem; border-left: 3p
 .notesbar { position: sticky; top: 0; z-index: 20; display: flex; align-items: center; gap: 0.6rem; background: var(--bg); padding: 0.4rem 0 0.6rem; margin-bottom: 0.6rem; border-bottom: 1px solid var(--line); }
 .notesbar-brand { font-weight: 800; color: inherit; }
 .notesbar .count { background: var(--warn); color: #fff; border-radius: 999px; padding: 0 0.45rem; font-size: 0.75rem; margin-left: 0.3rem; }
-.notes-panel { position: absolute; right: 0; top: 2.6rem; width: min(520px, 96vw); max-height: 70vh; overflow-y: auto; background: var(--card); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 12px 32px rgba(0,0,0,0.18); padding: 0.8rem 1rem; }
+.notes-anchor { position: relative; }
+.notes-panel { position: absolute; right: 0; top: 2.2rem; width: min(520px, 96vw); max-height: 70vh; overflow-y: auto; background: var(--card); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 12px 32px rgba(0,0,0,0.18); padding: 0.8rem 1rem; }
 .note-row { border-top: 1px solid var(--line); padding: 0.6rem 0; }
 .note-meta { display: flex; gap: 0.35rem; flex-wrap: wrap; align-items: center; margin-bottom: 0.3rem; }
 .note-text { margin: 0.2rem 0 0.5rem; background: var(--note); border-radius: 8px; padding: 0.4rem 0.6rem; }

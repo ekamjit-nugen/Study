@@ -1,7 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { inline } from "../lib/md";
 import { useNotes, type Note } from "../lib/notes";
-import { useLocal } from "../lib/useLocal";
 import { Code } from "./Bits";
 
 function NoteRow({ n, onRemove }: { n: Note; onRemove: () => void }) {
@@ -29,12 +28,24 @@ function NoteRow({ n, onRemove }: { n: Note; onRemove: () => void }) {
 /** The top bar: always visible, shows the notes count and opens the notes panel. */
 export function NotesBar({ onMenu }: { onMenu: () => void }) {
   const { notes, remove } = useNotes();
-  const [open, setOpen] = useLocal<boolean>("fsm-notes-open", false);
+  const [open, setOpen] = useState(false);
+  const box = useRef<HTMLDivElement>(null);
+  // Close on Escape, and on any click or tap outside the button + panel.
   useEffect(() => {
-    const on = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
-    window.addEventListener("keydown", on);
-    return () => window.removeEventListener("keydown", on);
-  }, [setOpen]);
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    const onDown = (e: MouseEvent | TouchEvent) => {
+      if (box.current && !box.current.contains(e.target as Node)) setOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("touchstart", onDown);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("touchstart", onDown);
+    };
+  }, [open]);
   const recent = [...notes].reverse();
   return (
     <div className="notesbar">
@@ -45,6 +56,7 @@ export function NotesBar({ onMenu }: { onMenu: () => void }) {
         🚀 Full-Stack Mastery
       </a>
       <span style={{ flex: 1 }} />
+      <div className="notes-anchor" ref={box}>
       <button className={`btn small ${open ? "primary" : ""}`} onClick={() => setOpen(!open)} title="Your notes">
         📝 Notes {notes.length > 0 && <span className="count">{notes.length}</span>}
       </button>
@@ -73,6 +85,7 @@ export function NotesBar({ onMenu }: { onMenu: () => void }) {
           )}
         </div>
       )}
+      </div>
     </div>
   );
 }
