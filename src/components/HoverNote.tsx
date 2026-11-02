@@ -5,7 +5,7 @@ import { getCurrentNoteContext, noteId, onNoteContext, useNotes } from "../lib/n
 const CANDIDATES = "h1, h2, h3, h4, p, li, td, th, .vbox, .analogy-line, .step-lead, .callout, .problem, .tapcard .q, .tapcard .a, .practical-q, .overview li, pre.code";
 const EXCLUDE = ".notesbar, .notes-panel, .sqlrunner, .note-btn, button, input, textarea, .step-nav, .nav-foot, .sidebar, .hovernote";
 
-type Target = { text: string; where: string; rect: DOMRect; selection?: boolean };
+type Target = { text: string; where: string; selection?: boolean };
 
 function labelFor(el: Element): string {
   const tag = el.tagName.toLowerCase();
@@ -23,6 +23,7 @@ function labelFor(el: Element): string {
 export default function HoverNote() {
   const { has, toggle } = useNotes();
   const [target, setTarget] = useState<Target | null>(null);
+  const [pos, setPos] = useState({ x: 0, y: 0 });
   const [, bump] = useState(0);
   const hideTimer = useRef<number | null>(null);
   const overButton = useRef(false);
@@ -30,11 +31,21 @@ export default function HoverNote() {
   useEffect(() => onNoteContext(() => { setTarget(null); bump((n) => n + 1); }), []);
 
   useEffect(() => {
-    const main = document.querySelector(".main");
+    const main = document.querySelector<HTMLElement>(".main");
     if (!main) return;
     const cancelHide = () => { if (hideTimer.current) { window.clearTimeout(hideTimer.current); hideTimer.current = null; } };
     const scheduleHide = () => { cancelHide(); hideTimer.current = window.setTimeout(() => { if (!overButton.current) setTarget(null); }, 250); };
 
+    // The button follows the cursor (a little above and to the right) until the cursor is on the button.
+    let raf = 0;
+    const onMove = (e: MouseEvent) => {
+      if (overButton.current) return;
+      if (raf) return;
+      raf = window.requestAnimationFrame(() => {
+        raf = 0;
+        setPos({ x: e.clientX, y: e.clientY });
+      });
+    };
     const onOver = (e: Event) => {
       if (!getCurrentNoteContext()) return;
       const sel = window.getSelection();
@@ -44,10 +55,12 @@ export default function HoverNote() {
       const text = (el as HTMLElement).innerText.replace(/\s*📝\s*(noted)?\s*$/u, "").trim();
       if (text.length < 3) { scheduleHide(); return; }
       cancelHide();
-      setTarget({ text: text.slice(0, 700), where: labelFor(el), rect: el.getBoundingClientRect() });
+      const me = e as MouseEvent;
+      if (typeof me.clientX === "number") setPos({ x: me.clientX, y: me.clientY });
+      setTarget({ text: text.slice(0, 700), where: labelFor(el) });
     };
     const onLeave = () => scheduleHide();
-    const onSelect = () => {
+    const onSelect = (e: Event) => {
       if (!getCurrentNoteContext()) return;
       const sel = window.getSelection();
       if (!sel || sel.isCollapsed || !sel.rangeCount) return;
@@ -58,10 +71,17 @@ export default function HoverNote() {
       const text = sel.toString().trim();
       if (text.length < 3) return;
       cancelHide();
-      setTarget({ text: text.slice(0, 700), where: "selection · " + labelFor(el.closest(CANDIDATES) ?? el), rect: range.getBoundingClientRect(), selection: true });
+      const me = e as MouseEvent;
+      if (typeof me.clientX === "number" && me.clientX > 0) setPos({ x: me.clientX, y: me.clientY });
+      else {
+        const r = range.getBoundingClientRect();
+        setPos({ x: r.left + r.width / 2, y: r.top });
+      }
+      setTarget({ text: text.slice(0, 700), where: "selection · " + labelFor(el.closest(CANDIDATES) ?? el), selection: true });
     };
     const onScroll = () => setTarget((t) => (t?.selection ? t : null));
     main.addEventListener("mouseover", onOver);
+    main.addEventListener("mousemove", onMove);
     main.addEventListener("mouseleave", onLeave);
     document.addEventListener("mouseup", onSelect);
     document.addEventListener("touchend", onSelect);
@@ -69,7 +89,9 @@ export default function HoverNote() {
     window.addEventListener("scroll", onScroll, true);
     return () => {
       main.removeEventListener("mouseover", onOver);
+      main.removeEventListener("mousemove", onMove);
       main.removeEventListener("mouseleave", onLeave);
+      if (raf) window.cancelAnimationFrame(raf);
       document.removeEventListener("mouseup", onSelect);
       document.removeEventListener("touchend", onSelect);
       window.removeEventListener("scroll", onScroll, true);
@@ -79,8 +101,9 @@ export default function HoverNote() {
   const ctx = getCurrentNoteContext();
   if (!target || !ctx) return null;
   const noted = has(noteId(ctx, target.text));
-  const top = Math.max(8, target.rect.top - 30);
-  const left = Math.min(window.innerWidth - 150, Math.max(8, target.selection ? target.rect.left : target.rect.right - 110));
+  // Sit just above-right of the cursor, kept inside the viewport.
+  const top = Math.max(8, Math.min(window.innerHeight - 40, pos.y - 38));
+  const left = Math.max(8, Math.min(window.innerWidth - 170, pos.x + 12));
   return (
     <button
       className={`hovernote ${noted ? "noted" : ""}`}
