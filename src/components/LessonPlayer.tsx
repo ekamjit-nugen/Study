@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { Course, Module, Topic, Section, RealWorld, Practice, Interview, Quiz } from "../courses/types";
 import { inline, Prose } from "../lib/md";
 import { useProgress } from "../lib/progress";
@@ -346,13 +346,43 @@ export default function LessonPlayer({ course, module, topic, prev, next, onPage
   const [saved, setSaved] = useLocal<number>(`fsm-step-${id}`, 0);
   const [i, setI] = useState(Math.min(saved, steps.length - 1));
   const [showMap, setShowMap] = useState(false);
+  const [book, setBook] = useLocal<boolean>("fsm-book-mode", true);
+  const bookRef = useRef<HTMLDivElement>(null);
   const go = (n: number) => {
     const c = Math.max(0, Math.min(steps.length - 1, n));
     setI(c);
     setSaved(c);
     setShowMap(false);
-    window.scrollTo({ top: 0 });
+    if (book && bookRef.current) bookRef.current.scrollTo({ left: c * bookRef.current.clientWidth, behavior: "smooth" });
+    else window.scrollTo({ top: 0 });
   };
+  // Book mode: the pages sit side by side; a horizontal swipe or trackpad scroll flips them.
+  // Keep the current page in sync when the user scrolls/swipes instead of pressing Next.
+  useEffect(() => {
+    const el = bookRef.current;
+    if (!book || !el) return;
+    el.scrollTo({ left: i * el.clientWidth });
+    let t = 0;
+    const onScroll = () => {
+      window.clearTimeout(t);
+      t = window.setTimeout(() => {
+        const n = Math.round(el.scrollLeft / el.clientWidth);
+        if (n !== i && n >= 0 && n < steps.length) {
+          setI(n);
+          setSaved(n);
+        }
+      }, 120);
+    };
+    const onResize = () => el.scrollTo({ left: i * el.clientWidth });
+    el.addEventListener("scroll", onScroll);
+    window.addEventListener("resize", onResize);
+    return () => {
+      el.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onResize);
+      window.clearTimeout(t);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [book, i, steps.length]);
   useEffect(() => {
     const on = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement | null;
@@ -376,8 +406,11 @@ export default function LessonPlayer({ course, module, topic, prev, next, onPage
           <button className="btn small" onClick={() => setShowMap((m) => !m)}>
             {showMap ? "✕ close map" : "☰ lesson map"}
           </button>
+          <button className={`btn small ${book ? "primary" : ""}`} onClick={() => setBook(!book)} title={book ? "Book mode: swipe or scroll sideways to turn pages" : "Switch to book mode: pages side by side"}>
+            {book ? "📖 book" : "📄 single"}
+          </button>
           <button className="btn small" onClick={onPageView} title="Read everything on one long page">
-            📖 whole page
+            📜 whole page
           </button>
         </div>
       </div>
@@ -399,18 +432,36 @@ export default function LessonPlayer({ course, module, topic, prev, next, onPage
           ))}
         </div>
       )}
-      <div className={`card step step-${step.kind}`} key={i}>
-        <div className="step-kind">{step.label}</div>
-        <h2 className="step-title">{inline(step.title)}</h2>
-        {step.lead && <p className="step-lead">{inline(step.lead)}</p>}
-        <div className="step-body">{step.body}</div>
-      </div>
+      {book ? (
+        <div className="book" ref={bookRef}>
+          {steps.map((st, k) => (
+            <div className={`page ${k === i ? "current" : ""}`} key={k} aria-hidden={k !== i}>
+              <div className={`card step step-${st.kind}`}>
+                <div className="step-kind">
+                  {st.label} <span className="muted" style={{ fontWeight: 400 }}>· page {k + 1} of {steps.length}</span>
+                </div>
+                <h2 className="step-title">{inline(st.title)}</h2>
+                {st.lead && <p className="step-lead">{inline(st.lead)}</p>}
+                {Math.abs(k - i) <= 1 ? <div className="step-body">{st.body}</div> : <div className="step-body muted small">…</div>}
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className={`card step step-${step.kind}`} key={i}>
+          <div className="step-kind">{step.label}</div>
+          <h2 className="step-title">{inline(step.title)}</h2>
+          {step.lead && <p className="step-lead">{inline(step.lead)}</p>}
+          <div className="step-body">{step.body}</div>
+        </div>
+      )}
       <div className="step-nav">
         <button className="btn" onClick={() => go(i - 1)} disabled={i === 0}>
           ← Back
         </button>
         <span className="small muted">
-          <span className="kbd">←</span> <span className="kbd">→</span> keys work too
+          {book ? "swipe or scroll sideways · " : ""}
+          <span className="kbd">←</span> <span className="kbd">→</span>
         </span>
         {i < steps.length - 1 ? (
           <button className="btn primary" onClick={() => go(i + 1)}>

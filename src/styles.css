@@ -344,3 +344,12 @@ div.notable { display: block; }
 @keyframes holdspin { from { transform: rotate(0deg) scale(0.6); opacity: 0.4; } to { transform: rotate(300deg) scale(1); opacity: 1; } }
 .hovernote { padding: 0.45rem 0.9rem; font-size: 0.9rem; }
 .main .candidate-hint { }
+
+/* book mode: pages side by side, flip by swiping or scrolling sideways */
+.book { display: flex; overflow-x: auto; overflow-y: hidden; scroll-snap-type: x mandatory; scroll-behavior: smooth; gap: 0; margin: 0 -0.5rem; padding: 0 0.5rem; -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain; scrollbar-width: none; }
+.book::-webkit-scrollbar { display: none; }
+.book .page { flex: 0 0 100%; width: 100%; scroll-snap-align: start; scroll-snap-stop: always; box-sizing: border-box; padding: 0 0.25rem; height: calc(100dvh - 215px); overflow-y: auto; overscroll-behavior-y: contain; }
+.book .page > .step { min-height: 100%; margin-bottom: 0; animation: none; }
+.book .page:not(.current) { opacity: 0.55; }
+.book .page.current { opacity: 1; }
+@media (max-width: 900px) { .book .page { height: calc(100dvh - 190px); } }
