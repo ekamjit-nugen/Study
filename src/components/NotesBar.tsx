@@ -26,7 +26,7 @@ function NoteRow({ n, onRemove }: { n: Note; onRemove: () => void }) {
 }
 
 /** The top bar: always visible, shows the notes count and opens the notes panel. */
-export function NotesBar({ onMenu }: { onMenu: () => void }) {
+export function NotesBar({ onMenu, onQuickGo }: { onMenu: () => void; onQuickGo: () => void }) {
   const { notes, remove } = useNotes();
   const [open, setOpen] = useState(false);
   const box = useRef<HTMLDivElement>(null);
@@ -56,6 +56,9 @@ export function NotesBar({ onMenu }: { onMenu: () => void }) {
         🚀 Full-Stack Mastery
       </a>
       <span style={{ flex: 1 }} />
+      <button className="btn small" onClick={onQuickGo} title="Jump to any topic, idea, chapter, mission or tool (Ctrl/⌘+K)">
+        ⚡ Quick go
+      </button>
       <div className="notes-anchor" ref={box}>
       <button className={`btn small ${open ? "primary" : ""}`} onClick={() => setOpen(!open)} title="Your notes">
         📝 Notes {notes.length > 0 && <span className="count">{notes.length}</span>}

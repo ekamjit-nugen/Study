@@ -63,6 +63,10 @@ export default function Sidebar({ route, open, onClose, theme, setTheme }: { rou
             <div className="progressbar">
               <div style={{ width: `${total ? (doneCount / total) * 100 : 0}%` }} />
             </div>
+            <a href={href.quick(course.id)} className={`side-topic summary ${route.page === "quick" ? "active" : ""}`} onClick={onClose}>
+              <span className="num">⚡</span>
+              <span>Quick learn: all topics, short</span>
+            </a>
             {course.modules.map((m, mi) => (
               <div key={m.id}>
                 <div className="side-module">

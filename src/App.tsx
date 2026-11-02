@@ -8,6 +8,8 @@ import { MissionPage, ProjectHome } from "./components/Project";
 import { NotesBar, NotesPage } from "./components/NotesBar";
 import ChapterSummary from "./components/ChapterSummary";
 import HoverNote from "./components/HoverNote";
+import QuickGo from "./components/QuickGo";
+import QuickLearn from "./components/QuickLearn";
 import { findCourse } from "./courses/registry";
 import { useRoute } from "./lib/route";
 
@@ -16,6 +18,17 @@ export default function App() {
   const [open, setOpen] = useState(false);
   const [theme, setThemeState] = useState(() => document.documentElement.getAttribute("data-theme") ?? "light");
   const [view, setView] = useLocal<"steps" | "page">("fsm-topic-view", "steps");
+  const [quickGo, setQuickGo] = useState(false);
+  useEffect(() => {
+    const on = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setQuickGo((q) => !q);
+      }
+    };
+    window.addEventListener("keydown", on);
+    return () => window.removeEventListener("keydown", on);
+  }, []);
   const setTheme = (t: string) => {
     setThemeState(t);
     document.documentElement.setAttribute("data-theme", t);
@@ -41,6 +54,9 @@ export default function App() {
   else if (route.page === "chapter") {
     const course = findCourse(route.course);
     body = course ? <ChapterSummary key={route.moduleId} course={course} moduleId={route.moduleId} /> : <div className="content"><h1>Not found</h1></div>;
+  } else if (route.page === "quick") {
+    const course = findCourse(route.course);
+    body = course ? <QuickLearn course={course} /> : <div className="content"><h1>Not found</h1></div>;
   }
   else {
     const course = findCourse(route.course);
@@ -59,7 +75,7 @@ export default function App() {
             <TopicView key={route.slug} course={course} module={flat[idx].m} topic={flat[idx].t} prev={flat[idx - 1]?.t} next={flat[idx + 1]?.t} />
           </div>
         );
-      else body = <LessonPlayer key={route.slug} course={course} module={flat[idx].m} topic={flat[idx].t} prev={flat[idx - 1]?.t} next={flat[idx + 1]?.t} onPageView={() => setView("page")} />;
+      else body = <LessonPlayer key={route.slug} course={course} module={flat[idx].m} topic={flat[idx].t} prev={flat[idx - 1]?.t} next={flat[idx + 1]?.t} onPageView={() => setView("page")} initialStep={route.step} />;
     }
   }
 
@@ -67,9 +83,10 @@ export default function App() {
     <div className="app">
       <Sidebar route={route} open={open} onClose={() => setOpen(false)} theme={theme} setTheme={setTheme} />
       <main className="main">
-        <NotesBar onMenu={() => setOpen(true)} />
+        <NotesBar onMenu={() => setOpen(true)} onQuickGo={() => setQuickGo(true)} />
         {body}
         <HoverNote />
+        <QuickGo open={quickGo} onClose={() => setQuickGo(false)} />
       </main>
     </div>
   );

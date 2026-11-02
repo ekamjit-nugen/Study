@@ -16,7 +16,7 @@ import { Notable } from "./Notable";
 import { chapterHref } from "./ChapterSummary";
 
 type Kind = "start" | "idea" | "try" | "quiz" | "problem" | "practice" | "interview" | "finish";
-type Step = { kind: Kind; label: string; title: string; lead?: string; body: ReactNode };
+type Step = { kind: Kind; label: string; title: string; lead?: string; body: ReactNode; /** stable anchor, e.g. "section-2", "quiz-1", "problem-1", "practice-1", "interview-1", "start", "finish" */ ref: string };
 
 const KIND_LABEL: Record<Kind, string> = {
   start: "Start",
@@ -89,6 +89,7 @@ function sectionSteps(s: Section, n: number): Step[] {
   );
   if (hasIdea) {
     out.push({
+      ref: `section-${n}`,
       kind: "idea",
       label: `Idea ${n}`,
       title: s.title,
@@ -114,6 +115,7 @@ function sectionSteps(s: Section, n: number): Step[] {
   s.code?.forEach((c, i) => {
     const last = i === (s.code?.length ?? 0) - 1 && !hasSql;
     out.push({
+      ref: hasIdea || i > 0 ? `section-${n}-code-${i + 1}` : `section-${n}`,
       kind: "try",
       label: `Idea ${n} · code`,
       title: c.title ?? s.title,
@@ -131,6 +133,7 @@ function sectionSteps(s: Section, n: number): Step[] {
   s.sql?.forEach((q, i) => {
     const last = i === (s.sql?.length ?? 0) - 1;
     out.push({
+      ref: hasIdea || hasCode || i > 0 ? `section-${n}-sql-${i + 1}` : `section-${n}`,
       kind: "try",
       label: `Idea ${n} · run it`,
       title: q.title ?? s.title,
@@ -165,6 +168,7 @@ function realWorldSteps(rw: RealWorld, n: number): Step[] {
   const out: Step[] = [];
   const hasSolution = !!(rw.sql || rw.code);
   out.push({
+    ref: `problem-${n}`,
     kind: "problem",
     label: `Real problem ${n}`,
     title: rw.title,
@@ -181,6 +185,7 @@ function realWorldSteps(rw: RealWorld, n: number): Step[] {
   });
   if (hasSolution)
     out.push({
+      ref: `problem-${n}-solution`,
       kind: "problem",
       label: `Real problem ${n} · solution`,
       title: "Solution: " + rw.title,
@@ -197,6 +202,7 @@ function realWorldSteps(rw: RealWorld, n: number): Step[] {
 
 function practiceStep(p: Practice, i: number, id: string): Step {
   return {
+    ref: `practice-${i + 1}`,
     kind: "practice",
     label: `Practice ${i + 1}`,
     title: p.q,
@@ -224,6 +230,7 @@ function interviewSteps(items: Interview[]): Step[] {
   for (let i = 0; i < items.length; i += 3) {
     const chunk = items.slice(i, i + 3);
     out.push({
+      ref: `interview-${Math.floor(i / 3) + 1}`,
       kind: "interview",
       label: `Interview ${Math.floor(i / 3) + 1}`,
       title: chunk.length === 1 ? "One interview question" : `${chunk.length} interview questions`,
@@ -240,6 +247,7 @@ function interviewSteps(items: Interview[]): Step[] {
 
 function quizStep(q: Quiz, i: number, total: number, chosen: number | null, onChoose: (c: number) => void): Step {
   return {
+    ref: `quiz-${i + 1}`,
     kind: "quiz",
     label: `Quick check ${i + 1} of ${total}`,
     title: q.q,
@@ -254,6 +262,7 @@ export function buildSteps(topic: Topic, courseId: string, next: Topic | undefin
   const id = `${courseId}/${topic.slug}`;
   const steps: Step[] = [];
   steps.push({
+    ref: "start",
     kind: "start",
     label: "Start",
     title: topic.title,
@@ -292,6 +301,7 @@ export function buildSteps(topic: Topic, courseId: string, next: Topic | undefin
   const answered = quiz.filter((_, i) => quizState[i] !== undefined).length;
   const correct = quiz.filter((q, i) => quizState[i] === q.answer).length;
   steps.push({
+    ref: "finish",
     kind: "finish",
     label: "Done",
     title: done ? "🎉 Topic complete" : "You made it to the end",
@@ -327,7 +337,17 @@ export function buildSteps(topic: Topic, courseId: string, next: Topic | undefin
   return steps;
 }
 
-export default function LessonPlayer({ course, module, topic, prev, next, onPageView }: { course: Course; module: Module; topic: Topic; prev?: Topic; next?: Topic; onPageView: () => void }) {
+export type StepOutline = { index: number; ref: string; kind: Kind; title: string; label: string };
+/** The list of pages a topic has, with their index and anchor, for deep links and jump menus. */
+export function stepOutline(topic: Topic, courseId: string): StepOutline[] {
+  return buildSteps(topic, courseId, undefined, undefined, false, {}, () => {}).map((s, index) => ({ index, ref: s.ref, kind: s.kind, title: s.title, label: s.label }));
+}
+export function stepIndexForRef(topic: Topic, courseId: string, ref: string): number {
+  const i = stepOutline(topic, courseId).findIndex((s) => s.ref === ref);
+  return i < 0 ? 0 : i;
+}
+
+export default function LessonPlayer({ course, module, topic, prev, next, onPageView, initialStep }: { course: Course; module: Module; topic: Topic; prev?: Topic; next?: Topic; onPageView: () => void; initialStep?: number }) {
   const { isDone, toggle } = useProgress();
   const id = `${course.id}/${topic.slug}`;
   const done = isDone(id);
@@ -344,7 +364,12 @@ export default function LessonPlayer({ course, module, topic, prev, next, onPage
   const noteCtx: NoteContext = { courseId: course.id, courseTitle: course.title, moduleId: module.id, moduleTitle: `${mi + 1}. ${module.title}`, topicSlug: topic.slug, topicTitle: topic.title, href: href.topic(course.id, topic.slug) };
   useRegisterNoteContext(noteCtx);
   const [saved, setSaved] = useLocal<number>(`fsm-step-${id}`, 0);
-  const [i, setI] = useState(Math.min(saved, steps.length - 1));
+  const [i, setI] = useState(Math.min(initialStep ?? saved, steps.length - 1));
+  // A deep link (#/course/topic/<n>) jumps to that page even if the topic is already open.
+  useEffect(() => {
+    if (initialStep !== undefined) go(initialStep);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialStep]);
   const [showMap, setShowMap] = useState(false);
   const [book, setBook] = useLocal<boolean>("fsm-book-mode", true);
   const bookRef = useRef<HTMLDivElement>(null);

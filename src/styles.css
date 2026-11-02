@@ -354,3 +354,21 @@ div.notable { display: block; }
 .book .page.current { opacity: 1; }
 @media (max-width: 900px) { .book .page { height: calc(100dvh - 190px); } }
 @media (max-width: 600px) { .step-nav > .small { display: none; } }
+
+/* quick learn + quick go */
+.quick-chapter { margin-top: 1.6rem; }
+.quick-topic { margin-bottom: 0.8rem; }
+.quick-story { font-size: 0.95rem; color: var(--muted); margin: 0.5rem 0; }
+.quick-points { margin: 0 0 0.6rem; }
+.quick-points li { margin: 0.2rem 0; font-size: 0.95rem; }
+.chip.muted { color: var(--muted); }
+a.chip { text-decoration: none; }
+a.chip:hover { border-color: var(--accent); color: var(--accent); }
+.quickgo-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.35); z-index: 60; display: flex; justify-content: center; align-items: flex-start; padding-top: 8vh; }
+.quickgo { width: min(640px, 94vw); background: var(--card); border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); padding: 0.8rem; }
+.quickgo .search { margin-bottom: 0.5rem; font-size: 1rem; }
+.quickgo-list { max-height: 55vh; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
+.quickgo-item { display: grid; grid-template-columns: auto 1fr; grid-template-rows: auto auto; column-gap: 0.6rem; align-items: center; text-align: left; background: transparent; border: 1px solid transparent; border-radius: 8px; padding: 0.4rem 0.6rem; color: var(--text); }
+.quickgo-item .pill { grid-row: 1 / span 2; min-width: 62px; text-align: center; }
+.quickgo-item .quickgo-label { font-weight: 600; }
+.quickgo-item.on { background: var(--accent-soft); border-color: var(--accent); }
