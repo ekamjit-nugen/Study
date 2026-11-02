@@ -1,7 +1,7 @@
 import { CHAPTERS } from "../courses/db/chapters";
 import type { Course } from "../courses/types";
 import { inline } from "../lib/md";
-import { NoteCtx, type NoteContext } from "../lib/notes";
+import { NoteCtx, useRegisterNoteContext, type NoteContext } from "../lib/notes";
 import { useProgress } from "../lib/progress";
 import { href } from "../lib/route";
 import { Callout, TapCards } from "./Bits";
@@ -17,6 +17,8 @@ export default function ChapterSummary({ course, moduleId }: { course: Course; m
   const module = course.modules[mi];
   const chapter = CHAPTERS.find((c) => c.moduleId === moduleId);
   const { isDone } = useProgress();
+  const ctxForHover: NoteContext | null = module ? { courseId: course.id, courseTitle: course.title, moduleId: module.id, moduleTitle: `${mi + 1}. ${module.title}`, href: chapterHref(course.id, module.id) } : null;
+  useRegisterNoteContext(ctxForHover);
   if (!module || !chapter)
     return (
       <div className="content">

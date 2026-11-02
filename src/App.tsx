@@ -7,6 +7,7 @@ import { CheatSheet, CourseHome, HardProblems, Home, InterviewBank, Playground }
 import { MissionPage, ProjectHome } from "./components/Project";
 import { NotesBar, NotesPage } from "./components/NotesBar";
 import ChapterSummary from "./components/ChapterSummary";
+import HoverNote from "./components/HoverNote";
 import { findCourse } from "./courses/registry";
 import { useRoute } from "./lib/route";
 
@@ -68,6 +69,7 @@ export default function App() {
       <main className="main">
         <NotesBar onMenu={() => setOpen(true)} />
         {body}
+        <HoverNote />
       </main>
     </div>
   );

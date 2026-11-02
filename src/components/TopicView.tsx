@@ -4,6 +4,7 @@ import { inline, Prose } from "../lib/md";
 import { useProgress } from "../lib/progress";
 import { href } from "../lib/route";
 import { useLocal } from "../lib/useLocal";
+import { NoteCtx, useRegisterNoteContext, type NoteContext } from "../lib/notes";
 import { Callout, Code, DataTable, More, TapCards, Tldr, Words } from "./Bits";
 import { Diagram } from "./Diagrams";
 import SqlRunner from "./SqlRunner";
@@ -116,7 +117,11 @@ export default function TopicView({ course, module, topic, prev, next }: { cours
   const [mode, setMode] = useLocal<Mode>("fsm-view", "visual");
   const id = `${course.id}/${topic.slug}`;
   const done = isDone(id);
+  const mi = course.modules.findIndex((m) => m.id === module.id);
+  const noteCtx: NoteContext = { courseId: course.id, courseTitle: course.title, moduleId: module.id, moduleTitle: `${mi + 1}. ${module.title}`, topicSlug: topic.slug, topicTitle: topic.title, href: href.topic(course.id, topic.slug) };
+  useRegisterNoteContext(noteCtx);
   return (
+    <NoteCtx.Provider value={noteCtx}>
     <div className="content">
       <div className="row" style={{ justifyContent: "space-between" }}>
         <div className="small muted">
@@ -187,5 +192,6 @@ export default function TopicView({ course, module, topic, prev, next }: { cours
         <span>{next && <a href={href.topic(course.id, next.slug)}>{next.title} →</a>}</span>
       </div>
     </div>
+    </NoteCtx.Provider>
   );
 }

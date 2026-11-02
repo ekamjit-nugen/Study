@@ -1,5 +1,5 @@
 // Notes the learner marks while studying: any marked line remembers where it came from.
-import { createContext, useContext, useSyncExternalStore } from "react";
+import { createContext, useContext, useEffect, useSyncExternalStore } from "react";
 
 export type NoteContext = {
   courseId: string;
@@ -22,6 +22,31 @@ export type Note = NoteContext & {
 
 export const NoteCtx = createContext<NoteContext | null>(null);
 export const useNoteContext = () => useContext(NoteCtx);
+
+/* The page currently on screen registers its context so the hover popup (outside React's tree) can use it. */
+let current: NoteContext | null = null;
+const ctxListeners = new Set<() => void>();
+export function getCurrentNoteContext(): NoteContext | null {
+  return current;
+}
+export function useRegisterNoteContext(ctx: NoteContext | null) {
+  useEffect(() => {
+    current = ctx;
+    ctxListeners.forEach((l) => l());
+    return () => {
+      if (current === ctx) {
+        current = null;
+        ctxListeners.forEach((l) => l());
+      }
+    };
+  }, [ctx?.href]); // eslint-disable-line react-hooks/exhaustive-deps
+}
+export function onNoteContext(l: () => void): () => void {
+  ctxListeners.add(l);
+  return () => {
+    ctxListeners.delete(l);
+  };
+}
 
 /** Stable id for a line: same text in the same place → same note. */
 export function noteId(ctx: NoteContext, text: string): string {

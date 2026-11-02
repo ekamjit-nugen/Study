@@ -11,7 +11,7 @@ import { interviewAnswer, interviewQuestion, interviewTag } from "./InterviewCar
 import { Ladder, Visual, splitBullet } from "./Visuals";
 import { QuizCard } from "./QuizCard";
 import { useLastTopic } from "../lib/learner";
-import { NoteCtx, type NoteContext } from "../lib/notes";
+import { NoteCtx, useRegisterNoteContext, type NoteContext } from "../lib/notes";
 import { Notable } from "./Notable";
 import { chapterHref } from "./ChapterSummary";
 
@@ -342,6 +342,7 @@ export default function LessonPlayer({ course, module, topic, prev, next, onPage
   );
   const mi = course.modules.findIndex((m) => m.id === module.id);
   const noteCtx: NoteContext = { courseId: course.id, courseTitle: course.title, moduleId: module.id, moduleTitle: `${mi + 1}. ${module.title}`, topicSlug: topic.slug, topicTitle: topic.title, href: href.topic(course.id, topic.slug) };
+  useRegisterNoteContext(noteCtx);
   const [saved, setSaved] = useLocal<number>(`fsm-step-${id}`, 0);
   const [i, setI] = useState(Math.min(saved, steps.length - 1));
   const [showMap, setShowMap] = useState(false);
