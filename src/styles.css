@@ -353,3 +353,4 @@ div.notable { display: block; }
 .book .page:not(.current) { opacity: 0.55; }
 .book .page.current { opacity: 1; }
 @media (max-width: 900px) { .book .page { height: calc(100dvh - 190px); } }
+@media (max-width: 600px) { .step-nav > .small { display: none; } }
