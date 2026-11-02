@@ -44,7 +44,7 @@ export default function ChapterSummary({ course, moduleId }: { course: Course; m
           <div className="step-kind">Chapter {mi + 1} summary</div>
           <h2 className="step-title">{module.title}</h2>
           <p className="step-lead">{inline(module.simple)}</p>
-          <p className="small muted">Press 📝 next to any line to keep it in your notes. Each note links back here or to its topic.</p>
+          <p className="small muted">Press and hold any line (or select words) to save it as a note. Each note links back here or to its topic.</p>
 
           <h3>What you can now do</h3>
           <ol className="overview">

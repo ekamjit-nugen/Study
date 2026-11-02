@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { getCurrentNoteContext, noteId, onNoteContext, useNotes } from "../lib/notes";
 
-/** Elements whose text can be saved as a note by hovering or selecting. */
+/** Elements whose text can be saved as a note by long-pressing or selecting. */
 const CANDIDATES = "h1, h2, h3, h4, p, li, td, th, .vbox, .analogy-line, .step-lead, .callout, .problem, .tapcard .q, .tapcard .a, .practical-q, .overview li, pre.code";
-const EXCLUDE = ".notesbar, .notes-panel, .sqlrunner, .note-btn, button, input, textarea, .step-nav, .nav-foot, .sidebar, .hovernote";
+const EXCLUDE = ".notesbar, .notes-panel, .sqlrunner, .note-btn, button, input, textarea, a, .step-nav, .nav-foot, .sidebar, .hovernote";
+const HOLD_MS = 450;
+const MOVE_TOLERANCE = 10;
 
 type Target = { text: string; where: string; selection?: boolean };
 
@@ -17,49 +19,65 @@ function labelFor(el: Element): string {
 }
 
 /**
- * A floating "📝 Note" button that follows the mouse over any text block, or a text selection.
- * Mounted once in App; only active while a page has registered a note context.
+ * Long-press (mouse or finger, ~half a second, without moving) on any text block to get a
+ * "📝 Note this" button that stays where you pressed until you click it or click elsewhere.
+ * Selecting text shows the same button at the selection. Mounted once in App.
  */
 export default function HoverNote() {
   const { has, toggle } = useNotes();
   const [target, setTarget] = useState<Target | null>(null);
   const [pos, setPos] = useState({ x: 0, y: 0 });
+  const [holding, setHolding] = useState<{ x: number; y: number } | null>(null);
   const [, bump] = useState(0);
-  const hideTimer = useRef<number | null>(null);
-  const overButton = useRef(false);
+  const timer = useRef<number | null>(null);
+  const start = useRef<{ x: number; y: number; el: Element } | null>(null);
+  const suppressContextMenu = useRef(false);
 
   useEffect(() => onNoteContext(() => { setTarget(null); bump((n) => n + 1); }), []);
 
   useEffect(() => {
     const main = document.querySelector<HTMLElement>(".main");
     if (!main) return;
-    const cancelHide = () => { if (hideTimer.current) { window.clearTimeout(hideTimer.current); hideTimer.current = null; } };
-    const scheduleHide = () => { cancelHide(); hideTimer.current = window.setTimeout(() => { if (!overButton.current) setTarget(null); }, 250); };
-
-    // The button follows the cursor (a little above and to the right) until the cursor is on the button.
-    let raf = 0;
-    const onMove = (e: MouseEvent) => {
-      if (overButton.current) return;
-      if (raf) return;
-      raf = window.requestAnimationFrame(() => {
-        raf = 0;
-        setPos({ x: e.clientX, y: e.clientY });
-      });
+    const clearHold = () => {
+      if (timer.current) window.clearTimeout(timer.current);
+      timer.current = null;
+      start.current = null;
+      setHolding(null);
     };
-    const onOver = (e: Event) => {
+    const onDown = (e: PointerEvent) => {
       if (!getCurrentNoteContext()) return;
-      const sel = window.getSelection();
-      if (sel && !sel.isCollapsed) return; // a selection popup is showing
-      const el = (e.target as Element).closest(CANDIDATES);
-      if (!el || el.closest(EXCLUDE) || !main.contains(el)) { scheduleHide(); return; }
-      const text = (el as HTMLElement).innerText.replace(/\s*📝\s*(noted)?\s*$/u, "").trim();
-      if (text.length < 3) { scheduleHide(); return; }
-      cancelHide();
-      const me = e as MouseEvent;
-      if (typeof me.clientX === "number") setPos({ x: me.clientX, y: me.clientY });
-      setTarget({ text: text.slice(0, 700), where: labelFor(el) });
+      if (e.button !== 0 && e.pointerType === "mouse") return;
+      const t = e.target as Element;
+      if (t.closest(".hovernote")) return;
+      setTarget(null); // a press elsewhere dismisses the current popup
+      const el = t.closest(CANDIDATES);
+      if (!el || el.closest(EXCLUDE) || !main.contains(el)) return;
+      start.current = { x: e.clientX, y: e.clientY, el };
+      setHolding({ x: e.clientX, y: e.clientY });
+      timer.current = window.setTimeout(() => {
+        const s = start.current;
+        if (!s) return;
+        const text = (s.el as HTMLElement).innerText.replace(/\s*📝\s*(noted)?\s*$/u, "").trim();
+        if (text.length >= 3) {
+          setPos({ x: s.x, y: s.y });
+          setTarget({ text: text.slice(0, 700), where: labelFor(s.el) });
+          suppressContextMenu.current = true; // phones open a callout on long press; we show ours instead
+          window.getSelection()?.removeAllRanges();
+        }
+        clearHold();
+      }, HOLD_MS);
     };
-    const onLeave = () => scheduleHide();
+    const onMove = (e: PointerEvent) => {
+      const s = start.current;
+      if (s && (Math.abs(e.clientX - s.x) > MOVE_TOLERANCE || Math.abs(e.clientY - s.y) > MOVE_TOLERANCE)) clearHold();
+    };
+    const onUp = () => clearHold();
+    const onContextMenu = (e: Event) => {
+      if (suppressContextMenu.current) {
+        e.preventDefault();
+        suppressContextMenu.current = false;
+      }
+    };
     const onSelect = (e: Event) => {
       if (!getCurrentNoteContext()) return;
       const sel = window.getSelection();
@@ -70,52 +88,55 @@ export default function HoverNote() {
       if (!el || !main.contains(el) || el.closest(EXCLUDE)) return;
       const text = sel.toString().trim();
       if (text.length < 3) return;
-      cancelHide();
       const me = e as MouseEvent;
+      const r = range.getBoundingClientRect();
       if (typeof me.clientX === "number" && me.clientX > 0) setPos({ x: me.clientX, y: me.clientY });
-      else {
-        const r = range.getBoundingClientRect();
-        setPos({ x: r.left + r.width / 2, y: r.top });
-      }
+      else setPos({ x: r.left + r.width / 2, y: r.top });
       setTarget({ text: text.slice(0, 700), where: "selection · " + labelFor(el.closest(CANDIDATES) ?? el), selection: true });
     };
-    const onScroll = () => setTarget((t) => (t?.selection ? t : null));
-    main.addEventListener("mouseover", onOver);
-    main.addEventListener("mousemove", onMove);
-    main.addEventListener("mouseleave", onLeave);
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setTarget(null);
+    const onScroll = () => setTarget(null);
+    main.addEventListener("pointerdown", onDown);
+    main.addEventListener("pointermove", onMove);
+    main.addEventListener("pointerup", onUp);
+    main.addEventListener("pointercancel", onUp);
+    main.addEventListener("contextmenu", onContextMenu);
     document.addEventListener("mouseup", onSelect);
     document.addEventListener("touchend", onSelect);
-    document.addEventListener("selectionchange", () => { const s = window.getSelection(); if (s && s.isCollapsed) setTarget((t) => (t?.selection ? null : t)); });
+    window.addEventListener("keydown", onKey);
     window.addEventListener("scroll", onScroll, true);
     return () => {
-      main.removeEventListener("mouseover", onOver);
-      main.removeEventListener("mousemove", onMove);
-      main.removeEventListener("mouseleave", onLeave);
-      if (raf) window.cancelAnimationFrame(raf);
+      main.removeEventListener("pointerdown", onDown);
+      main.removeEventListener("pointermove", onMove);
+      main.removeEventListener("pointerup", onUp);
+      main.removeEventListener("pointercancel", onUp);
+      main.removeEventListener("contextmenu", onContextMenu);
       document.removeEventListener("mouseup", onSelect);
       document.removeEventListener("touchend", onSelect);
+      window.removeEventListener("keydown", onKey);
       window.removeEventListener("scroll", onScroll, true);
+      clearHold();
     };
   }, []);
 
   const ctx = getCurrentNoteContext();
+  if (holding && !target) {
+    // a small ring that fills while you hold, so you know a note is coming
+    return <span className="hold-ring" style={{ left: holding.x - 14, top: holding.y - 14 }} />;
+  }
   if (!target || !ctx) return null;
   const noted = has(noteId(ctx, target.text));
-  // Sit just above-right of the cursor, kept inside the viewport.
-  const top = Math.max(8, Math.min(window.innerHeight - 40, pos.y - 38));
-  const left = Math.max(8, Math.min(window.innerWidth - 170, pos.x + 12));
+  const top = Math.max(8, Math.min(window.innerHeight - 40, pos.y - 44));
+  const left = Math.max(8, Math.min(window.innerWidth - 190, pos.x - 60));
   return (
     <button
       className={`hovernote ${noted ? "noted" : ""}`}
       style={{ top, left }}
-      onMouseEnter={() => { overButton.current = true; }}
-      onMouseLeave={() => { overButton.current = false; setTarget(null); }}
-      onMouseDown={(e) => e.preventDefault()}
       onClick={() => {
         toggle(ctx, target.text, target.where);
         bump((n) => n + 1);
         if (target.selection) window.getSelection()?.removeAllRanges();
-        window.setTimeout(() => setTarget(null), 600);
+        window.setTimeout(() => setTarget(null), 700);
       }}
       title={noted ? "Remove this note" : "Save this text as a note"}
     >

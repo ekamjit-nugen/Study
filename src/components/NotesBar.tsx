@@ -74,7 +74,7 @@ export function NotesBar({ onMenu }: { onMenu: () => void }) {
             </span>
           </div>
           {notes.length === 0 ? (
-            <p className="small muted">Nothing saved yet. Press 📝 next to any summary line, "in 30 seconds" card, analogy, practical question or "Remember" line to save it here.</p>
+            <p className="small muted">Nothing saved yet. Press and hold on any text for half a second (or select some words) and press "📝 Note this". The 📝 buttons next to summary lines and cards work too.</p>
           ) : (
             recent.slice(0, 8).map((n) => <NoteRow key={n.id} n={n} onRemove={() => remove(n.id)} />)
           )}
