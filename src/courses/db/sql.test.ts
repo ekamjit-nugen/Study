@@ -30,6 +30,12 @@ for (const m of DB_COURSE.modules) {
         cases.push({ name: `${t.slug} §${si + 1}.${qi + 1} ${q.title ?? ""}`, sql: q.sql, expectError: intentional, topic: t.slug });
       }),
     );
+    t.tale?.forEach((pg, pi) =>
+      pg.queries?.forEach((q, qi) => {
+        const intentional = /fail/i.test((q.note ?? "") + (q.title ?? ""));
+        cases.push({ name: `${t.slug} page ${pi + 1}.${qi + 1} ${q.title ?? ""}`, sql: q.sql, expectError: intentional, topic: t.slug });
+      }),
+    );
     t.realWorld?.forEach((rw, i) => rw.sql && cases.push({ name: `${t.slug} real-world ${i + 1}: ${rw.title}`, sql: rw.sql }));
     t.practice.forEach((p, i) => p.sql && cases.push({ name: `${t.slug} practice ${i + 1}`, sql: p.sql, mustReturnRows: true }));
     t.interview.forEach((q, i) => q.sql && cases.push({ name: `${t.slug} interview ${i + 1}: ${q.q}`, sql: q.sql }));

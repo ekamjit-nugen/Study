@@ -9,6 +9,7 @@ import { Diagram } from "./Diagrams";
 import SqlRunner from "./SqlRunner";
 import { interviewAnswer, interviewQuestion, interviewTag } from "./InterviewCard";
 import TermHelp from "./TermHelp";
+import { PracticeAnswer, StoryPageView } from "./Story";
 import { Ladder, Visual, splitBullet } from "./Visuals";
 import { QuizCard } from "./QuizCard";
 import { useLastTopic } from "../lib/learner";
@@ -250,7 +251,7 @@ function practiceStep(p: Practice, i: number, id: string, slug: string): Step {
         <TapCards
           items={[
             { q: "💡 Give me a hint", a: p.hint ?? firstSentence(p.explain).lead },
-            { q: "Show the answer", a: `**Answer:** ${p.answer}\n\n**Why:** ${p.explain}` },
+            { q: "Show the answer", a: <PracticeAnswer p={p} /> },
           ]}
         />
         {p.sql && (
@@ -333,7 +334,17 @@ export function buildSteps(topic: Topic, courseId: string, next: Topic | undefin
       </>
     ),
   });
-  topic.sections.forEach((s, i) => steps.push(...sectionSteps(s, i + 1, topic.slug)));
+  if (topic.tale) {
+    topic.tale.forEach((pg, i) =>
+      steps.push({
+        ref: `page-${i + 1}`,
+        kind: "idea",
+        label: `Page ${i + 1}`,
+        title: pg.title,
+        body: <StoryPageView page={pg} slug={topic.slug} cast={i === 0 ? topic.cast : undefined} />,
+      }),
+    );
+  } else topic.sections.forEach((s, i) => steps.push(...sectionSteps(s, i + 1, topic.slug)));
   const quiz = topic.quiz ?? [];
   quiz.forEach((q, i) => steps.push(quizStep(q, i, quiz.length, quizState[i] ?? null, (c) => setQuiz(i, c))));
   topic.realWorld?.forEach((rw, i) => steps.push(...realWorldSteps(rw, i + 1, topic.slug)));
@@ -477,9 +488,11 @@ export default function LessonPlayer({ course, module, topic, prev, next, onPage
           <button className={`btn small ${book ? "primary" : ""}`} onClick={() => setBook(!book)} title={book ? "Book mode: swipe or scroll sideways to turn pages" : "Switch to book mode: pages side by side"}>
             {book ? "📖 book" : "📄 single"}
           </button>
-          <button className="btn small" onClick={onPageView} title="Read everything on one long page">
-            📜 whole page
-          </button>
+          {!topic.tale && (
+            <button className="btn small" onClick={onPageView} title="Read everything on one long page">
+              📜 whole page
+            </button>
+          )}
         </div>
       </div>
       <div className="progress-row">

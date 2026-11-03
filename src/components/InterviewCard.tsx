@@ -3,6 +3,7 @@ import type { Interview } from "../courses/types";
 import { Prose } from "../lib/md";
 import { Code } from "./Bits";
 import SqlRunner from "./SqlRunner";
+import { InterviewLines } from "./Story";
 
 export function interviewTag(q: Interview): ReactNode {
   return (
@@ -17,6 +18,7 @@ export function interviewAnswer(q: Interview, extra?: ReactNode): ReactNode {
   return (
     <>
       {q.sql && <Code ex={{ lang: "sql", src: q.sql }} />}
+      {q.lines && <InterviewLines q={q} />}
       <Prose text={q.a} />
       {q.sql && <SqlRunner sql={q.sql} title="Check it on the data" />}
       {extra}

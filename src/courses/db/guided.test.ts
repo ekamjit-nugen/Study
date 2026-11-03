@@ -7,6 +7,21 @@ describe("guided style on every topic", () => {
     for (const m of DB_COURSE.modules)
       for (const t of m.topics) {
         expect(t.guided, t.slug + " guided").toBe(true);
+        if (t.tale) {
+          // story format: scenes instead of sections
+          expect(t.tale.length, t.slug + " pages").toBeGreaterThanOrEqual(6);
+          expect(t.cast, t.slug + " cast").toBeTruthy();
+          for (const pg of t.tale) {
+            expect(pg.text.length, `${t.slug}: ${pg.title} text`).toBeGreaterThan(80);
+            for (const q of pg.queries ?? []) {
+              expect(q.lines?.length, `${t.slug}: ${pg.title} query lines`).toBeGreaterThan(0);
+              for (const l of q.lines ?? []) expect(q.sql.includes(l.sql.trim()), `${t.slug}: line '${l.sql}' not in its query`).toBe(true);
+            }
+          }
+          expect(t.tale[t.tale.length - 1].title.startsWith("Connect it back"), t.slug + " connect-back").toBe(true);
+          for (const pr of t.practice) if (pr.sql) expect(pr.lines?.length, `${t.slug}: practice '${pr.q}' lines`).toBeGreaterThan(0);
+          continue;
+        }
         expect(t.sections[0].ask, t.slug + " first section asks").toBeTruthy();
         expect(t.sections.filter((s) => s.ask).length, t.slug + " think-first pages").toBeGreaterThanOrEqual(2);
         expect(t.sections[t.sections.length - 1].title.startsWith("Connect it back"), t.slug + " connect-back").toBe(true);

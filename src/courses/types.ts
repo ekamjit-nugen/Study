@@ -132,10 +132,47 @@ export type RealWorld = {
   takeaway: string;
 };
 
+/** One line of a query, read aloud in plain words. */
+export type StoryLine = { sql: string; say: string };
+
+/** A query inside a story page: the SQL, optionally read line by line, and what to look for in the result. */
+export type StoryQuery = {
+  title?: string;
+  sql: string;
+  /** Line-by-line reading; the learner can switch between this and just running it. */
+  lines?: StoryLine[];
+  note?: string;
+  explain?: boolean;
+  /** What the reader should look for in the rows that come back. */
+  expect?: string;
+};
+
+/**
+ * A page of a story-style topic: a few short paragraphs that read like a scene, then the query it leads to.
+ * Any paragraph that contains jargon gets the definition rendered right under it.
+ */
+export type StoryPage = {
+  title: string;
+  /** Scene label shown above the title, e.g. "Monday, 9:10 — support desk". */
+  when?: string;
+  /** Markdown paragraphs separated by blank lines. */
+  text: string;
+  /** Definitions for words not in the course glossary: [word, meaning]. */
+  jargon?: [string, string][];
+  table?: Table;
+  visual?: VisualSpec;
+  diagram?: DiagramId;
+  queries?: StoryQuery[];
+  /** A question to sit with before turning the page. */
+  ask?: string;
+};
+
 export type Practice = {
   q: string;
   answer: string;
   explain: string;
+  /** The solution read line by line (the learner can choose this or the direct answer). */
+  lines?: StoryLine[];
   /** A nudge shown before the answer. Defaults to the first sentence of `explain`. */
   hint?: string;
   /** Solution query. When present the learner gets "Check my answer": their rows must match these rows. */
@@ -152,6 +189,8 @@ export type Interview = {
   tricky?: boolean;
   /** "What does this return?" style: the snippet is shown with the question and runs on the playground data. */
   sql?: string;
+  /** The snippet read line by line. */
+  lines?: StoryLine[];
 };
 
 /** A one-tap multiple-choice check with instant feedback. `answer` is the index of the right option. */
@@ -185,6 +224,10 @@ export type Topic = {
   quiz?: Quiz[];
   /** A guided walkthrough: slow build-up, think-first pages, checkpoints that must be answered before moving on. */
   guided?: boolean;
+  /** Story format: the topic is told as scenes (pages) instead of sections. Always read as a book, never one long page. */
+  tale?: StoryPage[];
+  /** Who is in the story, one line, shown on the first page. */
+  cast?: string;
   practice: Practice[];
   interview: Interview[];
   remember: string[];

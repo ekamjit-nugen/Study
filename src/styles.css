@@ -458,3 +458,25 @@ a.chip:hover { border-color: var(--accent); color: var(--accent); }
 .termhelp-dash { color: var(--muted); }
 .termhelp-link { font-size: 0.8rem; white-space: nowrap; }
 .termhelp.compact { font-size: 0.86rem; padding: 0.5rem 0.75rem; }
+
+/* ---------------- story pages ---------------- */
+.storypage { max-width: 70ch; }
+.story-when { font-size: 0.78rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin-bottom: 0.3rem; }
+.story-cast { font-size: 0.92rem; color: var(--muted); font-style: italic; margin-bottom: 0.8rem; }
+.story-text p { font-size: 1.06rem; line-height: 1.7; margin: 0 0 0.9rem; }
+.story-para { margin-bottom: 0.4rem; }
+.jargon { border-left: 3px solid var(--accent); background: var(--accent-soft); border-radius: 0 10px 10px 0; padding: 0.45rem 0.8rem; margin: -0.3rem 0 1rem; font-size: 0.9rem; }
+.jargon-row { margin: 0.2rem 0; line-height: 1.5; }
+.jargon-row b { color: var(--accent); }
+.segmented { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; background: var(--card); }
+.segmented button { border: 0; background: transparent; color: var(--muted); font-size: 0.78rem; font-weight: 700; padding: 0.25rem 0.7rem; cursor: pointer; }
+.segmented button.on { background: var(--accent); color: #fff; }
+.lbl { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; margin: 0.5rem 0; }
+.lbl-row { display: contents; }
+.lbl-sql { background: var(--code-bg); color: var(--code-text); font-family: var(--mono); font-size: 0.84rem; padding: 0.45rem 0.7rem; white-space: pre-wrap; border-bottom: 1px solid rgba(255,255,255,0.08); }
+.lbl-say { padding: 0.45rem 0.7rem; font-size: 0.92rem; border-bottom: 1px solid var(--line); background: var(--card); }
+.storyq { margin: 0.8rem 0 1rem; }
+.storyq-head { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; font-weight: 700; font-size: 0.9rem; margin-bottom: 0.3rem; }
+.storyq-expect { background: var(--note, var(--card2)); border-radius: 10px; padding: 0.5rem 0.8rem; font-size: 0.92rem; margin-top: -0.4rem; }
+.story-ask { background: var(--note, #fff8dc); border-radius: 12px; padding: 0.8rem 1rem; font-size: 1rem; font-weight: 600; margin-top: 1rem; }
+@media (max-width: 640px) { .lbl { grid-template-columns: 1fr; } .lbl-sql { border-bottom: 0; } }

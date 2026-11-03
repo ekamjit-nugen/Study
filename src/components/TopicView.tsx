@@ -10,6 +10,7 @@ import { Diagram } from "./Diagrams";
 import SqlRunner from "./SqlRunner";
 import { interviewAnswer, interviewQuestion, interviewTag } from "./InterviewCard";
 import TermHelp from "./TermHelp";
+import { PracticeAnswer } from "./Story";
 import { Ladder, Visual, splitBullet } from "./Visuals";
 
 type Mode = "visual" | "full";
@@ -159,7 +160,7 @@ export default function TopicView({ course, module, topic, prev, next }: { cours
         {topic.practice.map((p, i) => (
           <div className="card practice" key={i}>
             <TermHelp slug={topic.slug} texts={[p.q, p.hint, p.explain, p.sql, p.starter]} compact />
-            <TapCards items={[{ q: p.q, a: `**Answer:** ${p.answer}\n\n**Why:** ${p.explain}` }]} />
+            <TapCards items={[{ q: p.q, a: <PracticeAnswer p={p} /> }]} />
             {p.sql && <SqlRunner sql={p.starter ?? "-- write your query here\n"} solution={p.sql} draftKey={`fsm-draft-${id}-${i}`} />}
             {p.sql && (
               <More title="Show the solution query">

@@ -67,7 +67,7 @@ export default function App() {
       const flat = course.modules.flatMap((m) => m.topics.map((t) => ({ m, t })));
       const idx = flat.findIndex((x) => x.t.slug === route.slug);
       if (idx < 0) body = <div className="content"><h1>Topic not found</h1><a href={`#/${course.id}`}>Back to {course.title}</a></div>;
-      else if (view === "page")
+      else if (view === "page" && !flat[idx].t.tale)
         body = (
           <div>
             <div className="content" style={{ marginBottom: "-0.5rem" }}>

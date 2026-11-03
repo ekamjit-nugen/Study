@@ -1,4 +1,5 @@
 import type { Module } from "../types";
+import { SELECT_CAST, TALE_SELECT } from "./tale-select";
 
 export const M02: Module = {
   id: "sql",
@@ -7,6 +8,8 @@ export const M02: Module = {
   topics: [
     {
       slug: "select-filter-sort",
+      tale: TALE_SELECT,
+      cast: SELECT_CAST,
       guided: true,
       title: "SELECT, WHERE, ORDER BY, LIMIT: the shape of every read",
       minutes: 14,
@@ -174,6 +177,12 @@ const { rows } = await db.query(
           answer: "Standing Desk (449), Ergonomic Chair (329), Noise-Cancelling Headphones (199).",
           explain: "ORDER BY price DESC then LIMIT 3 cuts the sorted list.",
           sql: `SELECT name, category, price FROM products ORDER BY price DESC LIMIT 3;`,
+          lines: [
+            { sql: "SELECT name, category, price", say: "The three columns to show." },
+            { sql: "FROM products", say: "The products table." },
+            { sql: "ORDER BY price DESC", say: "Dearest first." },
+            { sql: "LIMIT 3;", say: "Keep only the first three of the sorted list." },
+          ],
         },
         {
           q: "List customers whose email ends with 'example.com' and who signed up in 2024, newest first, showing name and signed_up.",
@@ -184,6 +193,13 @@ FROM customers
 WHERE email LIKE '%example.com'
   AND signed_up >= '2024-01-01' AND signed_up < '2025-01-01'
 ORDER BY signed_up DESC;`,
+          lines: [
+            { sql: "SELECT name, signed_up", say: "Name and the join date." },
+            { sql: "FROM customers", say: "The customers table." },
+            { sql: "WHERE email LIKE '%example.com'", say: "Email ends with example.com: anything, then that text, nothing after." },
+            { sql: "AND signed_up >= '2024-01-01' AND signed_up < '2025-01-01'", say: "Joined in 2024: on or after 1 Jan 2024 and before 1 Jan 2025. A half-open range never loses the last day." },
+            { sql: "ORDER BY signed_up DESC;", say: "Newest first." },
+          ],
           starter: `SELECT name, signed_up\nFROM customers\nWHERE ...\nORDER BY ...;`,
         },
         {
