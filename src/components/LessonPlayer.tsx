@@ -75,10 +75,29 @@ function AnalogyBox({ s }: { s: Section }) {
   );
 }
 
+/** "Think first": the question is shown; the explanation opens on demand. */
+function ThinkFirst({ ask, children }: { ask: string; children: ReactNode }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div>
+      <div className="think">
+        <div className="think-tag">🤔 Think first</div>
+        <div className="think-q">{inline(ask)}</div>
+        {!open && (
+          <button className="btn primary" onClick={() => setOpen(true)}>
+            I have an answer · show me
+          </button>
+        )}
+      </div>
+      {open && <div className="think-body">{children}</div>}
+    </div>
+  );
+}
+
 function sectionSteps(s: Section, n: number): Step[] {
   const out: Step[] = [];
   const { lead, rest } = s.body ? firstSentence(s.body) : { lead: "", rest: "" };
-  const hasIdea = !!(s.diagram || s.visual || s.bullets || s.table);
+  const hasIdea = !!(s.diagram || s.visual || s.bullets || s.table || s.ask || (s.body && s.body.length > 160));
   const hasSql = (s.sql?.length ?? 0) > 0;
   const hasCode = (s.code?.length ?? 0) > 0;
   const tipWarn = (
@@ -93,23 +112,27 @@ function sectionSteps(s: Section, n: number): Step[] {
       kind: "idea",
       label: `Idea ${n}`,
       title: s.title,
-      lead: lead || undefined,
-      body: (
-        <>
-          <AnalogyBox s={s} />
-          {s.diagram && <Diagram id={s.diagram} />}
-          {s.visual && <Visual spec={s.visual} />}
-          {s.bullets && <TapCards items={s.bullets.map((b) => { const { title, detail } = splitBullet(b); return { q: title, a: detail }; })} />}
-          {s.table && <DataTable table={s.table} />}
-          <ReadMore text={rest} />
-          {s.more && (
-            <More>
-              <Prose text={s.more} />
-            </More>
-          )}
-          {!hasSql && !hasCode && tipWarn}
-        </>
-      ),
+      lead: s.ask ? undefined : lead || undefined,
+      body: (() => {
+        const inner = (
+          <>
+            <AnalogyBox s={s} />
+            {s.ask && s.body && <Prose text={s.body} />}
+            {s.diagram && <Diagram id={s.diagram} />}
+            {s.visual && <Visual spec={s.visual} />}
+            {s.bullets && <TapCards items={s.bullets.map((b) => { const { title, detail } = splitBullet(b); return { q: title, a: detail }; })} />}
+            {s.table && <DataTable table={s.table} />}
+            {!s.ask && <ReadMore text={rest} />}
+            {s.more && (
+              <More>
+                <Prose text={s.more} />
+              </More>
+            )}
+            {!hasSql && !hasCode && tipWarn}
+          </>
+        );
+        return s.ask ? <ThinkFirst ask={s.ask}>{inner}</ThinkFirst> : inner;
+      })(),
     });
   }
   s.code?.forEach((c, i) => {
@@ -412,7 +435,7 @@ export default function LessonPlayer({ course, module, topic, prev, next, onPage
     const on = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement | null;
       if (t && (t.tagName === "TEXTAREA" || t.tagName === "INPUT")) return;
-      if (e.key === "ArrowRight") go(i + 1);
+      if (e.key === "ArrowRight" && !gated) go(i + 1);
       if (e.key === "ArrowLeft") go(i - 1);
     };
     window.addEventListener("keydown", on);
@@ -420,6 +443,8 @@ export default function LessonPlayer({ course, module, topic, prev, next, onPage
   });
   const step = steps[i];
   const pct = Math.round(((i + 1) / steps.length) * 100);
+  const quizIndex = step.kind === "quiz" ? Number(step.ref.split("-")[1]) - 1 : -1;
+  const gated = quizIndex >= 0 && quizState[quizIndex] === undefined;
   return (
     <NoteCtx.Provider value={noteCtx}>
     <div className="content player">
@@ -489,8 +514,8 @@ export default function LessonPlayer({ course, module, topic, prev, next, onPage
           <span className="kbd">←</span> <span className="kbd">→</span>
         </span>
         {i < steps.length - 1 ? (
-          <button className="btn primary" onClick={() => go(i + 1)}>
-            Next →
+          <button className="btn primary" onClick={() => go(i + 1)} disabled={gated} title={gated ? "Answer the question first" : undefined}>
+            {gated ? "Answer to continue" : "Next →"}
           </button>
         ) : chapterLink ? (
           <a className="btn primary" href={chapterLink.href}>

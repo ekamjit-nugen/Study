@@ -130,4 +130,19 @@ export const CHAPTERS: Chapter[] = [
       { q: "The interviewer says '10 million users, so we shard from day one'. Respond.", a: "10M users is tens of GB; one Postgres handles it. What matters is write rate and hot queries. Size the primary, add replicas and caching, partition event tables, and keep a tenant/user key in the schema so sharding is possible later if measurements demand it." },
     ],
   },
+  {
+    moduleId: "guided",
+    overview: [
+      { slug: "wallet-transfers-step-by-step", line: "A transaction makes the deduction and the credit all-or-nothing; a conditional UPDATE or a row lock stops two requests spending the same ₹800; an idempotency key stops the same transfer twice." },
+      { slug: "the-report-that-doubled", line: "A join produces one row per matching pair, so two one-to-many tables multiply each other. Pre-aggregate each child per parent, then join; DISTINCT only hides it." },
+      { slug: "indexes-from-zero", line: "Without an index a lookup reads every page; an index finds a value in a few reads at any size. Equality columns first, then the sort column; functions and common values defeat it." },
+    ],
+    rules: ["Transaction = all or nothing. It does not check amounts.", "Check-then-write in two steps is a race; put the check inside the write or lock first.", "Count rows per parent before you trust a SUM after a join.", "EXPLAIN first; a scan with a selective filter is your index."],
+    practical: [
+      { q: "Rahul has ₹1,000 and double-clicks Transfer ₹800. Describe the three protections a correct system has.", a: "A conditional UPDATE (WHERE balance >= 800) so the second deduction updates zero rows; one transaction around deduction and credit so a crash cannot half-apply it; an idempotency key per transfer so the second click finds the first and does nothing.", sql: "UPDATE accounts SET balance = balance - 800 WHERE id = 3 AND balance >= 800;\nSELECT changes() AS first_click;\nUPDATE accounts SET balance = balance - 800 WHERE id = 3 AND balance >= 800;\nSELECT changes() AS second_click, (SELECT balance FROM accounts WHERE id = 3) AS liam_balance;" },
+      { q: "Order 11 has 2 items and 1 payment. A report joins both and shows items 1,556 instead of 778. Explain and fix in one query.", a: "The join paired each item with the payment; with a second payment row it would double. Aggregate items and payments per order in CTEs, then join.", sql: "WITH items AS (SELECT order_id, SUM(qty * unit_price) AS items_total FROM order_items WHERE order_id = 11 GROUP BY order_id),\n     pays  AS (SELECT order_id, SUM(amount) AS paid FROM payments WHERE order_id = 11 GROUP BY order_id)\nSELECT items.order_id, items.items_total, pays.paid FROM items LEFT JOIN pays ON pays.order_id = items.order_id;" },
+      { q: "The login lookup by email takes 2 seconds at a million customers. What do you run first, and what do you expect to see?", a: "EXPLAIN on the lookup. Expect a sequential scan with a selective filter. Create an index on email and EXPLAIN again: scan becomes an index seek, and the query returns to milliseconds.", sql: "EXPLAIN QUERY PLAN SELECT id FROM customers WHERE email = 'priya@example.com';\nCREATE INDEX IF NOT EXISTS idx_customers_email ON customers(email);\nEXPLAIN QUERY PLAN SELECT id FROM customers WHERE email = 'priya@example.com';" },
+      { q: "With SELECT … FOR UPDATE, a colleague reads the balance, then locks, then updates. Is the transfer safe?", a: "No. The decision was made on a read taken before the lock, so two requests can both decide on ₹1,000. Lock first, then read inside the lock, then decide and update." },
+    ],
+  },
 ];

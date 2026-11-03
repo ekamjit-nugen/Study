@@ -372,3 +372,17 @@ a.chip:hover { border-color: var(--accent); color: var(--accent); }
 .quickgo-item .pill { grid-row: 1 / span 2; min-width: 62px; text-align: center; }
 .quickgo-item .quickgo-label { font-weight: 600; }
 .quickgo-item.on { background: var(--accent-soft); border-color: var(--accent); }
+
+/* think-first pages and reasoning checkpoints */
+.think { background: var(--note); border-radius: 12px; padding: 1rem 1.1rem; margin-bottom: 1rem; }
+.think-tag { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 800; color: var(--warn); }
+.think-q { font-size: 1.15rem; font-weight: 600; margin: 0.4rem 0 0.8rem; line-height: 1.5; }
+.think-body { animation: stepin 0.2s ease-out; }
+.quiz-setup { background: var(--card2); border: 1px solid var(--line); border-radius: 10px; padding: 0.6rem 0.9rem; margin-bottom: 0.6rem; }
+.quiz-setup p:last-child { margin-bottom: 0; }
+.quiz-opt.pending { border-color: var(--accent); background: var(--accent-soft); }
+.quiz-reason { margin: 0.4rem 0 0.8rem; display: grid; gap: 0.4rem; }
+.quiz-reason textarea { width: 100%; border: 1px solid var(--line); border-radius: 10px; padding: 0.6rem 0.8rem; font: inherit; background: var(--card); color: var(--text); resize: vertical; }
+.quiz-reason .btn { justify-self: start; }
+.callout p { margin: 0; display: inline; }
+.quote { margin: 0.6rem 0; padding: 0.5rem 0.9rem; border-left: 4px solid var(--accent); background: var(--accent-soft); border-radius: 0 10px 10px 0; font-weight: 600; }

@@ -6,6 +6,7 @@ import { M04 } from "./m04";
 import { M05 } from "./m05";
 import { M06 } from "./m06";
 import { M07 } from "./m07";
+import { M08 } from "./m08";
 import { INTERVIEW_EXTRA } from "./interviewExtra";
 import { QUIZ } from "./quiz";
 
@@ -16,7 +17,7 @@ export const DB_COURSE: Course = {
   emoji: "🗄️",
   tagline: "From 'what is a table' to isolation levels, query plans, sharding and the classic hard SQL problems, with every example runnable in your browser.",
   status: "ready",
-  modules: [M01, M02, M03, M04, M05, M06, M07].map((m) => ({
+  modules: [M01, M02, M03, M04, M05, M06, M07, M08].map((m) => ({
     ...m,
     topics: m.topics.map((t) => ({ ...t, quiz: QUIZ[t.slug] ?? [], interview: [...t.interview, ...(INTERVIEW_EXTRA[t.slug] ?? [])] })),
   })),

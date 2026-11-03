@@ -98,6 +98,8 @@ export type Table = { head: string[]; rows: string[][] };
 
 export type Section = {
   title: string;
+  /** A question to think about BEFORE the explanation. The page shows it first; the rest opens on "Show me". */
+  ask?: string;
   /** An everyday comparison, shown FIRST, before any SQL or jargon. 1–2 sentences. */
   analogy?: string;
   /** Plain words: what goes wrong for you if you skip this idea. 1 sentence. */
@@ -153,7 +155,18 @@ export type Interview = {
 };
 
 /** A one-tap multiple-choice check with instant feedback. `answer` is the index of the right option. */
-export type Quiz = { q: string; options: string[]; answer: number; why: string };
+export type Quiz = {
+  q: string;
+  options: string[];
+  answer: number;
+  why: string;
+  /** Feedback per option (same order as options), shown for the one the learner picked. */
+  whyOptions?: string[];
+  /** Ask the learner to write their reasoning in one or two sentences before revealing. */
+  reason?: boolean;
+  /** A scenario shown above the question, e.g. a table of balances. */
+  setup?: string;
+};
 
 export type Topic = {
   /** Unique within the course, kebab-case. Used in the URL: #/db/<slug>. */
@@ -170,6 +183,8 @@ export type Topic = {
   realWorld?: RealWorld[];
   /** 2–4 quick checks shown after the ideas, before the real problems. */
   quiz?: Quiz[];
+  /** A guided walkthrough: slow build-up, think-first pages, checkpoints that must be answered before moving on. */
+  guided?: boolean;
   practice: Practice[];
   interview: Interview[];
   remember: string[];
