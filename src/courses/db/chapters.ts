@@ -37,6 +37,8 @@ export const CHAPTERS: Chapter[] = [
       { slug: "subqueries-ctes", line: "A subquery can be a value, a list, a test (EXISTS) or a table. CTEs name the steps. WITH RECURSIVE walks trees of any depth." },
       { slug: "window-functions", line: "Window functions keep every row and add a column from its neighbours: ranks, top-N per group, running totals, LAG. Consecutive runs = value − ROW_NUMBER." },
       { slug: "writing-data", line: "Batch inserts, RETURNING, UPSERT with ON CONFLICT for idempotency, and BEGIN/COMMIT around related writes. Never await the network inside a transaction." },
+      { slug: "sql-toolkit", line: "NULL is unknown: NOT IN with a NULL returns nothing, use NOT EXISTS. CASE labels and pivots; COALESCE and NULLIF tame NULL and division by zero; UNION ALL unless you want dedupe; date ranges are half-open." },
+      { slug: "views-triggers-procedures", line: "A view is a saved query (one rule, one place), a materialized view a saved result you refresh, a trigger runs for every writer inside the transaction, a generated column is a formula the row keeps; procedures for set-based batch work near the data." },
     ],
     rules: ["Alias in ORDER BY yes, in WHERE no.", "LEFT JOIN + condition on the right table → put it in ON.", "NOT IN with a NULL returns nothing → NOT EXISTS.", "Top-N per group: ROW_NUMBER in a CTE, filter outside.", "Retries safe? Only with a unique key + ON CONFLICT."],
     practical: [
@@ -54,6 +56,7 @@ export const CHAPTERS: Chapter[] = [
       { slug: "normalization", line: "One fact in one place. 3NF: every non-key column depends on the key, the whole key, nothing but the key. Snapshot historical facts (the price you paid) on purpose." },
       { slug: "real-world-schema-patterns", line: "tenant_id first in every index, soft delete with a partial unique index, guarded status transitions, append-only history, and the three tree models." },
       { slug: "ids-and-migrations", line: "bigint inside, UUID v7 outside. Change a live schema with expand → migrate → contract, batched backfills, CONCURRENTLY, and a lock_timeout." },
+      { slug: "json-and-search", line: "JSON for the varying, display-only long tail with an expression or GIN index on what you filter; promote a key to a column when it becomes a business fact. LIKE '%x%' scans; full-text is an inverted index, typos are trigrams." },
     ],
     rules: ["If this value changes, how many rows change? More than one → split.", "Current facts normalise; historical facts snapshot.", "Soft delete needs WHERE deleted_at IS NULL in the unique index.", "Never RENAME a column in one step on a live system."],
     practical: [
@@ -71,6 +74,8 @@ export const CHAPTERS: Chapter[] = [
       { slug: "reading-query-plans", line: "EXPLAIN shows the plan, EXPLAIN ANALYZE shows reality. Find the biggest actual time × loops; compare estimated vs actual rows; Seq Scan with a selective filter wants an index." },
       { slug: "query-antipatterns", line: "N+1, OFFSET pagination, NOT IN with NULLs, SELECT *, non-sargable conditions and DISTINCT-as-band-aid cause most slow pages." },
       { slug: "pooling-caching-app-layer", line: "Pools small (10–20), one client per transaction, released in finally. Cache-aside with delete-on-write. Timeouts everywhere so overload fails fast." },
+      { slug: "orms-and-n-plus-one", line: "N+1 is a relation touched in a loop: load it eagerly or batch by ids. Aggregates belong in SQL (groupBy or raw with parameters). Log the ORM's SQL: contains is LIKE '%q%', skip is OFFSET." },
+      { slug: "database-operations", line: "Slower with the same data means dead rows or stale statistics: VACUUM and ANALYZE. Fix queries by total time from pg_stat_statements. Too many clients needs a pool and a pooler, never a bigger limit. Alert on cache hits, lag, waiting locks, long transactions, disk." },
     ],
     rules: ["Index the query shape, not the column list.", "Multiply node time by loops.", "Queries per request must not grow with list size.", "Never hold a connection across an external call."],
     practical: [
@@ -105,6 +110,7 @@ export const CHAPTERS: Chapter[] = [
       { slug: "partitioning-and-sharding", line: "Partition for size and retention on one server; shard by tenant/user across servers only after indexes, cache, replicas, partitions and a bigger box." },
       { slug: "distributed-consistency", line: "During a partition choose C or A. Write events in the same transaction (outbox), publish later, dedupe on consume. Sagas with compensations, not 2PC. Idempotency keys everywhere." },
       { slug: "sql-vs-nosql", line: "Relational for the truth, Redis for ephemeral speed, columnar for analytics, documents when you read whole documents by key. JSONB before a second database." },
+      { slug: "oltp-vs-olap", line: "OLTP is rows, keys and milliseconds; OLAP is columns, scans and seconds. Star schema: narrow facts, small dimensions. Loads must be idempotent; batch watermarks miss deletes, CDC does not. Replica, then rollups, then a warehouse." },
     ],
     rules: ["Pages touched is the cost; cache hits are everything.", "Own fresh writes → primary; everything else → replica.", "Scale order: indexes → cache → replicas → partitions → bigger box → split DBs → shard.", "At-least-once + idempotency = exactly-once effect."],
     practical: [
@@ -120,6 +126,7 @@ export const CHAPTERS: Chapter[] = [
     overview: [
       { slug: "classic-hard-sql-problems", line: "Almost every hard SQL question is top-N per group, gaps and islands, running/period comparison, set difference, self-join on a rule, dedupe, pivot or recursion. Say the tie and NULL rules out loud." },
       { slug: "system-design-with-databases", line: "Access patterns first, then entities, schema, indexes, scale, consistency. Primary for truth, cache for speed, columnar for analytics, events to connect them. Shard last." },
+      { slug: "postgres-vs-mysql-vs-sqlite", line: "Postgres is strict and rich, MySQL is clustered and permissive by history, SQLite is a library with one writer. Portable SQL groups by the key, uses ON CONFLICT, decides case handling explicitly, and never relies on the default isolation level." },
     ],
     rules: ["Name the pattern before writing SQL.", "Per group → PARTITION BY; consecutive → value − ROW_NUMBER; previous → LAG.", "Invariants → constraints; money → ledger; retries → idempotency keys.", "Say the trade-off with every choice."],
     practical: [
@@ -128,6 +135,21 @@ export const CHAPTERS: Chapter[] = [
       { q: "Design the data layer for a ride-hailing app in five sentences.", a: "Live driver locations in Redis GEO with TTLs. Rides in Postgres with guarded status transitions and an append-only ride_events table. Fares and payouts in a double-entry ledger with idempotency keys. Indexes per access pattern: rider/driver history by date, a partial index for dispatchable rides. Partition rides by month, replicas for history, outbox → warehouse for analytics; shard by city only if the primary cannot take the writes." },
       { q: "A like count read a million times a minute.", a: "Not COUNT(*) per read. Redis INCR per like, served from cache, flushed into a post_stats row; the likes table stays append-only for audit and recomputation." },
       { q: "The interviewer says '10 million users, so we shard from day one'. Respond.", a: "10M users is tens of GB; one Postgres handles it. What matters is write rate and hot queries. Size the primary, add replicas and caching, partition event tables, and keep a tenant/user key in the schema so sharding is possible later if measurements demand it." },
+    ],
+  },
+  {
+    moduleId: "security",
+    overview: [
+      { slug: "sql-injection-and-permissions", line: "Input glued into SQL becomes code; parameters keep it data. Identifiers and keywords come from allowlists. The app's role does only the app's job, reports read views, secrets live in the environment, passwords are bcrypt hashes, and an audit trigger records what matters." },
+      { slug: "multi-tenancy-and-rls", line: "tenant_id on every table, first in every index and in composite foreign keys so rows cannot point across tenants; row-level security plus SET LOCAL per request so a forgotten WHERE returns nothing; limits, partitions and sharding by tenant for the whale." },
+    ],
+    rules: ["Values are parameters; identifiers are allowlists; concatenation never.", "The app connects as a role that cannot DROP, cannot read other databases, and cannot see what it does not need.", "Passwords: bcrypt/argon2, compared in code. Never SHA-256, never WHERE password = …", "No table without tenant_id; every index leads with it; every child FK carries it.", "RLS is the safety net, the explicit tenant filter is the plan; test every endpoint as the wrong tenant."],
+    practical: [
+      { q: "A product search concatenates the query string into SQL. Show the attack on a copy of the table and then the safe form.", a: "Concatenation lets %'; DELETE FROM …; -- end the string, add a statement and comment out the rest. The safe form binds the value: LIKE '%' || :q || '%' with :q as a parameter, so the same text matches nothing and runs nothing.", sql: "CREATE TABLE IF NOT EXISTS demo_products AS SELECT * FROM products;\nSELECT name FROM demo_products WHERE name LIKE '%%'; DELETE FROM demo_products; --%';\nSELECT (SELECT COUNT(*) FROM demo_products) AS copy_after_attack, (SELECT COUNT(*) FROM products WHERE name LIKE '%' || '%''; DELETE FROM products; --' || '%') AS matches_as_value, (SELECT COUNT(*) FROM products) AS products_intact;" },
+      { q: "The UI sends ?sort=price&dir=desc. How do you sort safely when ORDER BY cannot take a parameter?", a: "An allowlist: a map from accepted inputs to SQL fragments you wrote (price → price, desc → DESC), default or reject anything else, and bind LIMIT as a validated number. Never interpolate the raw query-string value." },
+      { q: "Design the database roles for an API, a reporting dashboard and the migration job.", a: "app: SELECT/INSERT/UPDATE/DELETE on app tables, no DDL, statement_timeout. reporting: SELECT on views that hide PII, ideally on a replica. migrator: owns the schema, runs from one place only. Humans: superuser through a bastion with MFA, never in an environment variable." },
+      { q: "A line item for tenant A points at tenant B's invoice and the foreign key is satisfied. Fix the schema.", a: "Composite keys: invoices PRIMARY KEY (tenant_id, id); invoice_lines carries tenant_id and FOREIGN KEY (tenant_id, invoice_id) REFERENCES invoices (tenant_id, id). The cross-tenant row is refused by the database.", sql: "CREATE TABLE IF NOT EXISTS tenants (id INTEGER PRIMARY KEY, name TEXT NOT NULL);\nCREATE TABLE IF NOT EXISTS invoices (tenant_id INTEGER NOT NULL REFERENCES tenants(id), id INTEGER NOT NULL, amount REAL NOT NULL, PRIMARY KEY (tenant_id, id));\nCREATE TABLE IF NOT EXISTS invoice_lines (tenant_id INTEGER NOT NULL, id INTEGER NOT NULL, invoice_id INTEGER NOT NULL, amount REAL NOT NULL, PRIMARY KEY (tenant_id, id), FOREIGN KEY (tenant_id, invoice_id) REFERENCES invoices (tenant_id, id));\nINSERT OR IGNORE INTO tenants VALUES (1, 'Acme'), (2, 'Globex');\nINSERT OR IGNORE INTO invoices VALUES (1, 481, 100), (2, 482, 999);\nINSERT INTO invoice_lines VALUES (1, 1, 482, 60);  -- refused: Acme line on Globex invoice", fails: true },
+      { q: "With RLS enabled, a developer writes SELECT * FROM invoices WHERE id = 482 for tenant 1. What comes back, and what must the app have done first?", a: "Nothing comes back, because the policy adds tenant_id = current tenant to every statement. The app must have run SET LOCAL app.tenant = '1' inside the request's transaction, from the verified session, and must connect as a role that does not own the table (owners bypass RLS unless FORCE is set).", sql: "CREATE TABLE IF NOT EXISTS tenants (id INTEGER PRIMARY KEY, name TEXT NOT NULL);\nCREATE TABLE IF NOT EXISTS invoices (tenant_id INTEGER NOT NULL REFERENCES tenants(id), id INTEGER NOT NULL, amount REAL NOT NULL, PRIMARY KEY (tenant_id, id));\nINSERT OR IGNORE INTO tenants VALUES (1, 'Acme'), (2, 'Globex');\nINSERT OR IGNORE INTO invoices VALUES (1, 481, 100), (2, 482, 999);\nCREATE TABLE IF NOT EXISTS session_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);\nINSERT OR REPLACE INTO session_settings VALUES ('tenant', '1');\nCREATE VIEW IF NOT EXISTS my_invoices AS SELECT i.* FROM invoices i WHERE i.tenant_id = (SELECT CAST(value AS INTEGER) FROM session_settings WHERE key = 'tenant');\nSELECT COUNT(*) AS rows_for_482 FROM my_invoices WHERE id = 482;" },
     ],
   },
   {

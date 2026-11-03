@@ -1,7 +1,8 @@
 // Quick checks per topic: one tap, instant feedback. Keep the correct option position varied.
 import type { Quiz } from "../types";
+import { QUIZ_MORE } from "./quizMore";
 
-export const QUIZ: Record<string, Quiz[]> = {
+const QUIZ_BASE: Record<string, Quiz[]> = {
   "what-is-a-database": [
     { q: "Two requests update the same row at the same moment. What does a database promise that a JSON file cannot?", options: ["Both changes are kept, in order", "The last writer always wins", "The file is locked for an hour", "Nothing; it is the same"], answer: 0, setup: "Two requests update the same order row at the same moment: one marks it paid, the other changes the address.", reason: true, whyOptions: ["Correct. The database serialises the two writes on that row, so both changes survive in order. A file would let the second save overwrite the first.", "That is what happens with a file: whoever saves last wins and the other change vanishes. A database orders the two writes instead.", "Locks last milliseconds, not hours; the second write simply waits for the first.", "It is not the same: a file has no idea two writers exist."], why: "Concurrency control serialises the writes, so neither change is silently lost." },
     { q: "SQL is called declarative because…", options: ["it declares variables first", "you describe the result and the planner picks the steps", "it runs line by line like a script", "it needs a compiler"], answer: 1, whyOptions: ["Variables are not the point; declarative means you state the result you want.", "Correct. You say WHAT rows you want; the planner chooses HOW, which is why adding an index speeds up queries you never touched.", "SQL is not executed line by line like a script; a whole statement is planned as one unit.", "SQL is parsed and planned, but 'needs a compiler' is not what declarative means."], why: "You say WHAT; the planner decides HOW, which is why adding an index speeds up unchanged queries." },
@@ -231,3 +232,5 @@ export const QUIZ: Record<string, Quiz[]> = {
     },
   ],
 };
+
+export const QUIZ: Record<string, Quiz[]> = { ...QUIZ_BASE, ...QUIZ_MORE };
