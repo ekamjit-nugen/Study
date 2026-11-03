@@ -6,7 +6,6 @@ import { useProgress } from "../lib/progress";
 import { useLastTopic } from "../lib/learner";
 import { href } from "../lib/route";
 import { Callout, Code, TapCards } from "./Bits";
-import { Diagram } from "./Diagrams";
 import SqlRunner from "./SqlRunner";
 import { interviewAnswer, interviewQuestion, interviewTag } from "./InterviewCard";
 
@@ -212,31 +211,6 @@ export function InterviewBank() {
           tag: interviewTag(x.q),
         }))}
       />
-    </div>
-  );
-}
-
-export function Playground() {
-  return (
-    <div className="content">
-      <h1>SQL playground</h1>
-      <p className="muted">A real SQLite database in your browser with the shop data. Anything goes: CREATE, INSERT, EXPLAIN, window functions, recursive CTEs. Reset data brings everything back.</p>
-      <Diagram id="erd" />
-      <SqlRunner
-        sql={`-- Try anything. A few starters:
-SELECT c.name, COUNT(DISTINCT o.id) AS orders, ROUND(SUM(oi.qty * oi.unit_price), 2) AS spent
-FROM customers c
-LEFT JOIN orders o       ON o.customer_id = c.id AND o.status <> 'cancelled'
-LEFT JOIN order_items oi ON oi.order_id = o.id
-GROUP BY c.id
-ORDER BY spent DESC;`}
-        title="Scratchpad"
-        explain
-        draftKey="fsm-playground"
-      />
-      <div className="card soft small">
-        <b>Useful SQLite bits:</b> <code>SELECT name, sql FROM sqlite_master</code> lists tables and indexes · <code>PRAGMA table_info(orders)</code> shows columns · <code>EXPLAIN QUERY PLAN SELECT …</code> shows the plan (or press Show plan) · dates are text, so use <code>date(ordered_at)</code>, <code>strftime('%Y-%m', ordered_at)</code>.
-      </div>
     </div>
   );
 }

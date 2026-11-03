@@ -50,6 +50,30 @@ export async function resetShared(): Promise<Database> {
   return shared;
 }
 
+/** Swap the shared database for the given SQLite file bytes (a snapshot or an uploaded .sqlite). */
+export async function replaceShared(bytes: Uint8Array): Promise<Database> {
+  const SQL = await loadSql();
+  await sharedDb();
+  shared?.close();
+  shared = open(SQL, bytes);
+  listeners.forEach((l) => l());
+  notifyChange();
+  return shared;
+}
+
+/** A throw-away copy of the shared database as it is right now (indexes, edits and all). */
+export async function sharedCopy(): Promise<Database> {
+  const SQL = await loadSql();
+  const db = await sharedDb();
+  return open(SQL, db.export());
+}
+
+/** The shared database as SQLite file bytes. */
+export async function exportShared(): Promise<Uint8Array> {
+  const db = await sharedDb();
+  return db.export();
+}
+
 export function onReset(l: () => void): () => void {
   listeners.add(l);
   return () => listeners.delete(l);
@@ -69,12 +93,12 @@ export function onChange(l: () => void): () => void {
 const PKEY = "fsm-project-db";
 let project: Database | null = null;
 
-function toBase64(bytes: Uint8Array): string {
+export function toBase64(bytes: Uint8Array): string {
   let bin = "";
   for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
   return btoa(bin);
 }
-function fromBase64(b64: string): Uint8Array {
+export function fromBase64(b64: string): Uint8Array {
   const bin = atob(b64);
   const out = new Uint8Array(bin.length);
   for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);

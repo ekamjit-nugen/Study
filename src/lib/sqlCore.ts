@@ -118,3 +118,118 @@ export function peekTable(db: Database, table: string, limit: number): ResultSet
   }
   return { columns: rows[0].columns, rows: rows[0].values as ResultSet["rows"], total };
 }
+
+/* ---------------- schema browser + playground helpers ---------------- */
+
+export type ColumnInfo = { name: string; type: string; notnull: boolean; pk: number; dflt: string | null };
+export type FkInfo = { from: string; table: string; to: string };
+export type IndexInfo = { name: string; unique: boolean; columns: string[]; auto: boolean };
+export type TableInfo = {
+  name: string;
+  kind: "table" | "view";
+  sql: string;
+  rows: number;
+  columns: ColumnInfo[];
+  fks: FkInfo[];
+  indexes: IndexInfo[];
+};
+
+function q(name: string): string {
+  return `"${name.replace(/"/g, '""')}"`;
+}
+
+/** Every user table and view with its columns, foreign keys, indexes and row count. */
+export function schemaInfo(db: Database): TableInfo[] {
+  const list = db.exec("SELECT name, type, sql FROM sqlite_master WHERE type IN ('table','view') AND name NOT LIKE 'sqlite_%' ORDER BY type, name");
+  if (!list.length) return [];
+  return list[0].values.map((v) => {
+    const name = String(v[0]);
+    const kind = String(v[1]) as "table" | "view";
+    const sql = String(v[2] ?? "");
+    const cols = db.exec(`PRAGMA table_info(${q(name)})`);
+    const columns: ColumnInfo[] = cols.length
+      ? cols[0].values.map((c) => ({ name: String(c[1]), type: String(c[2] ?? ""), notnull: Number(c[3]) === 1, pk: Number(c[5]), dflt: c[4] === null ? null : String(c[4]) }))
+      : [];
+    const fkOut = db.exec(`PRAGMA foreign_key_list(${q(name)})`);
+    const fks: FkInfo[] = fkOut.length ? fkOut[0].values.map((f) => ({ table: String(f[2]), from: String(f[3]), to: String(f[4] ?? "id") })) : [];
+    const idxOut = db.exec(`PRAGMA index_list(${q(name)})`);
+    const indexes: IndexInfo[] = idxOut.length
+      ? idxOut[0].values.map((i) => {
+          const iname = String(i[1]);
+          const colsOut = db.exec(`PRAGMA index_info(${q(iname)})`);
+          return { name: iname, unique: Number(i[2]) === 1, auto: String(i[3]) !== "c", columns: colsOut.length ? colsOut[0].values.map((c) => String(c[2])) : [] };
+        })
+      : [];
+    let rows = 0;
+    try {
+      const cnt = db.exec(`SELECT COUNT(*) FROM ${q(name)}`);
+      rows = cnt.length ? Number(cnt[0].values[0][0]) : 0;
+    } catch {
+      rows = -1;
+    }
+    return { name, kind, sql, rows, columns, fks, indexes };
+  });
+}
+
+export type StatementOutcome = { sql: string; ok: true; result?: ResultSet; changes: number; ms: number } | { sql: string; ok: false; error: string; ms: number };
+
+/**
+ * Run a script one statement at a time so every statement gets its own result or error.
+ * Stops at the first error (the statements before it have already taken effect, as in a shell).
+ */
+export function runScript(db: Database, sql: string): { steps: StatementOutcome[]; ms: number } {
+  const now = () => (typeof performance !== "undefined" ? performance.now() : Date.now());
+  const t0 = now();
+  const steps: StatementOutcome[] = [];
+  // Statements are prepared one at a time, AFTER the previous one ran, so "CREATE TABLE x; INSERT INTO x" works.
+  const it = db.iterateStatements(sql);
+  try {
+    for (const st of it) {
+      const text = st.getSQL().trim();
+      st.free();
+      if (!text) continue;
+      const t1 = now();
+      try {
+        const out = db.exec(text);
+        const result = out.length ? { columns: out[0].columns, rows: out[0].values as ResultSet["rows"] } : undefined;
+        steps.push({ sql: text, ok: true, result, changes: result ? 0 : db.getRowsModified(), ms: now() - t1 });
+      } catch (e) {
+        steps.push({ sql: text, ok: false, error: e instanceof Error ? e.message : String(e), ms: now() - t1 });
+        break;
+      }
+    }
+  } catch (e) {
+    // the NEXT statement could not even be prepared (syntax error, unknown table)
+    let rest = sql;
+    try {
+      rest = it.getRemainingSQL().trim() || sql;
+    } catch {
+      /* ignore */
+    }
+    steps.push({ sql: rest, ok: false, error: e instanceof Error ? e.message : String(e), ms: 0 });
+  }
+  return { steps, ms: now() - t0 };
+}
+
+function csvCell(c: unknown): string {
+  if (c === null || c === undefined) return "";
+  const s = String(c);
+  return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
+/** RFC-4180 style CSV with a header row. */
+export function toCsv(rs: ResultSet): string {
+  return [rs.columns.map(csvCell).join(","), ...rs.rows.map((r) => r.map(csvCell).join(","))].join("\n");
+}
+
+/** Rows as an array of objects, for copying as JSON. */
+export function toObjects(rs: ResultSet): Record<string, unknown>[] {
+  return rs.rows.map((r) => Object.fromEntries(rs.columns.map((c, i) => [c, r[i]])));
+}
+
+/** An INSERT template for a table, with one placeholder per non-generated column. */
+export function insertTemplate(t: TableInfo): string {
+  const cols = t.columns.filter((c) => !(c.pk === 1 && /INT/i.test(c.type) && t.columns.filter((x) => x.pk).length === 1));
+  const vals = cols.map((c) => (/INT|REAL|NUM/i.test(c.type) ? "0" : /DATE|TIME/i.test(c.type) ? "'2024-01-01'" : "'text'"));
+  return `INSERT INTO ${t.name} (${cols.map((c) => c.name).join(", ")})\nVALUES (${vals.join(", ")});`;
+}
