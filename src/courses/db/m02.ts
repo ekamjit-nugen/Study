@@ -22,6 +22,7 @@ export const M02: Module = {
         ["predicate", "a condition in WHERE that is true, false or unknown per row"],
         ["parameterised query", "SQL with placeholders; values are sent separately, never pasted in"],
         ["SQL injection", "an attack where user input is treated as SQL code"],
+        ["VALUES (…)", "writes rows out by hand: WITH t AS (VALUES ('a'), ('b')) is a two-row table you can select from or join to"],
       ],
       sections: [
         {
@@ -221,6 +222,7 @@ ORDER BY signed_up DESC;`,
         ["aggregate", "a function that turns many values into one: COUNT, SUM, AVG, MIN, MAX"],
         ["group key", "the column(s) in GROUP BY that define each bucket"],
         ["pivot", "turning values of one column into separate output columns"],
+        ["GROUP_CONCAT(col, ', ')", "joins the values of a group into one comma-separated string (STRING_AGG in Postgres)"],
       ],
       sections: [
         {
@@ -681,6 +683,7 @@ ORDER BY categories DESC, c.name;`,
         ["correlated subquery", "a subquery that uses columns from the outer query"],
         ["CTE", "Common Table Expression: a named temporary result in WITH"],
         ["recursive CTE", "a CTE that references itself to walk a hierarchy"],
+        ["generate_series", "Postgres' built-in way to produce a run of numbers or dates as rows; in SQLite a recursive CTE does the same job"],
       ],
       sections: [
         {

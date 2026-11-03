@@ -23,6 +23,7 @@ export const M01: Module = {
         ["transaction", "a group of changes that succeed or fail together"],
         ["schema", "the shape of your data: tables, columns, types, rules"],
         ["declarative", "you describe the result, not the steps"],
+        ["PRAGMA", "asks SQLite about itself or changes a setting: PRAGMA table_info(orders) lists a table's columns"],
       ],
       sections: [
         {
@@ -205,6 +206,8 @@ SELECT id, name, stock FROM products WHERE id = 3;`,
         ["referential integrity", "the rule that every foreign key points at a real row"],
         ["join table", "a table whose job is to connect two others (many-to-many)"],
         ["surrogate key", "an id the database invents (serial, UUID) with no business meaning"],
+        ["schema", "the shape of the data: which tables exist, their columns, types, keys and rules"],
+        ["CREATE TABLE", "the statement that defines a table: CREATE TABLE name (column TYPE rules, …)"],
       ],
       sections: [
         {
@@ -405,6 +408,10 @@ ORDER BY e.id;`,
         ["CHECK constraint", "a rule a row must pass, like price >= 0"],
         ["enum", "a column allowed to hold only a fixed list of values"],
         ["JSONB", "Postgres's binary JSON column type, indexable"],
+        ["ROUND(x, 2)", "rounds a number to 2 decimal places, for tidy money columns"],
+        ["CAST(x AS type)", "converts a value to another type, e.g. CAST('42' AS INTEGER)"],
+        ["typeof(x)", "tells you the type SQLite actually stored for a value: integer, real, text, blob or null"],
+        ["CHECK (rule)", "a constraint every row must satisfy, e.g. CHECK (price >= 0); the database refuses writes that break it"],
       ],
       sections: [
         {

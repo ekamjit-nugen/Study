@@ -7,6 +7,7 @@ import { href } from "../lib/route";
 import { Callout, TapCards } from "./Bits";
 import { Notable } from "./Notable";
 import SqlRunner from "./SqlRunner";
+import TermHelp from "./TermHelp";
 
 export function chapterHref(courseId: string, moduleId: string) {
   return `#/${courseId}/chapter/${moduleId}`;
@@ -16,6 +17,7 @@ export default function ChapterSummary({ course, moduleId }: { course: Course; m
   const mi = course.modules.findIndex((m) => m.id === moduleId);
   const module = course.modules[mi];
   const chapter = CHAPTERS.find((c) => c.moduleId === moduleId);
+  const lastSlug = course.modules[mi]?.topics[course.modules[mi].topics.length - 1]?.slug ?? "";
   const { isDone } = useProgress();
   const ctxForHover: NoteContext | null = module ? { courseId: course.id, courseTitle: course.title, moduleId: module.id, moduleTitle: `${mi + 1}. ${module.title}`, href: chapterHref(course.id, module.id) } : null;
   useRegisterNoteContext(ctxForHover);
@@ -79,6 +81,7 @@ export default function ChapterSummary({ course, moduleId }: { course: Course; m
           <p className="small muted">Real situations. Think first, then tap to compare with the answer. Run the SQL where there is one.</p>
           {chapter.practical.map((p, i) => (
             <div key={i} className="card soft practical">
+              <TermHelp slug={lastSlug} texts={[p.q, p.a, p.sql]} compact />
               <Notable text={p.q} where="Practical question" block>
                 <div className="practical-q">
                   <span className="vnum" style={{ display: "inline-flex", marginRight: 8 }}>{i + 1}</span>

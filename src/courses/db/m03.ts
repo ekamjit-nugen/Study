@@ -184,6 +184,7 @@ HAVING COUNT(DISTINCT oi.unit_price) > 1;`,
         ["audit log", "an append-only record of who changed what and when"],
         ["state machine", "a fixed set of statuses and the allowed moves between them"],
         ["closure table", "a table storing every ancestor-descendant pair of a tree"],
+        ["denormalise", "deliberately copy a fact (a counter, a snapshot price) to make reads faster or freeze history, and keep the copy right"],
       ],
       sections: [
         {
@@ -381,6 +382,7 @@ ALTER TABLE bookings ADD CONSTRAINT no_double_booking
         ["backfill", "filling a new column for existing rows"],
         ["dual write", "writing to both the old and the new column during a transition"],
         ["lock", "the database stopping other sessions from touching a table while it changes"],
+        ["DROP TABLE", "deletes a whole table, rows and definition; DROP TABLE IF EXISTS avoids an error when it is already gone"],
       ],
       sections: [
         {

@@ -22,6 +22,7 @@ export const M05: Module = {
         ["fsync", "the OS call that forces data onto the physical disk"],
         ["invariant", "a rule that must always be true, like 'total money is constant'"],
         ["rollback", "undo everything since BEGIN (or since a savepoint)"],
+        ["race condition", "two requests interleave so the result depends on timing: both read 800, both subtract 500, the balance goes negative"],
       ],
       sections: [
         {

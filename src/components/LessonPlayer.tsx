@@ -8,6 +8,7 @@ import { Callout, Code, DataTable, More, TapCards } from "./Bits";
 import { Diagram } from "./Diagrams";
 import SqlRunner from "./SqlRunner";
 import { interviewAnswer, interviewQuestion, interviewTag } from "./InterviewCard";
+import TermHelp from "./TermHelp";
 import { Ladder, Visual, splitBullet } from "./Visuals";
 import { QuizCard } from "./QuizCard";
 import { useLastTopic } from "../lib/learner";
@@ -94,8 +95,11 @@ function ThinkFirst({ ask, children }: { ask: string; children: ReactNode }) {
   );
 }
 
-function sectionSteps(s: Section, n: number): Step[] {
+function sectionSteps(s: Section, n: number, slug: string): Step[] {
   const out: Step[] = [];
+  const help = <TermHelp slug={slug} texts={[s.title, s.ask, s.analogy, s.why, s.body, s.tip, s.warn, s.more, ...(s.bullets ?? []), ...(s.sql ?? []).map((q) => q.sql + "\n" + (q.note ?? "")), ...(s.code ?? []).map((c) => c.src)]} />;
+  let helpShown = false;
+  const helpOnce = () => { if (helpShown) return null; helpShown = true; return help; };
   const { lead, rest } = s.body ? firstSentence(s.body) : { lead: "", rest: "" };
   const hasIdea = !!(s.diagram || s.visual || s.bullets || s.table || s.ask || (s.body && s.body.length > 160));
   const hasSql = (s.sql?.length ?? 0) > 0;
@@ -131,7 +135,13 @@ function sectionSteps(s: Section, n: number): Step[] {
             {!hasSql && !hasCode && tipWarn}
           </>
         );
-        return s.ask ? <ThinkFirst ask={s.ask}>{inner}</ThinkFirst> : inner;
+        const first = helpOnce();
+        return (
+          <>
+            {first}
+            {s.ask ? <ThinkFirst ask={s.ask}>{inner}</ThinkFirst> : inner}
+          </>
+        );
       })(),
     });
   }
@@ -145,6 +155,7 @@ function sectionSteps(s: Section, n: number): Step[] {
       lead: !hasIdea && i === 0 ? lead || undefined : undefined,
       body: (
         <>
+          {helpOnce()}
           {!hasIdea && i === 0 && <AnalogyBox s={s} />}
           <Code ex={{ ...c, title: undefined }} />
           {!hasIdea && i === 0 && <ReadMore text={rest} />}
@@ -163,6 +174,7 @@ function sectionSteps(s: Section, n: number): Step[] {
       lead: !hasIdea && !hasCode && i === 0 ? lead || undefined : undefined,
       body: (
         <>
+          {helpOnce()}
           {!hasIdea && !hasCode && i === 0 && <AnalogyBox s={s} />}
           <SqlRunner sql={q.sql} note={q.note} explain={q.explain} title={q.title ? "Press Run" : undefined} />
           {!hasIdea && !hasCode && i === 0 && <ReadMore text={rest} />}
@@ -187,7 +199,7 @@ function Hidden({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-function realWorldSteps(rw: RealWorld, n: number): Step[] {
+function realWorldSteps(rw: RealWorld, n: number, slug: string): Step[] {
   const out: Step[] = [];
   const hasSolution = !!(rw.sql || rw.code);
   out.push({
@@ -198,6 +210,7 @@ function realWorldSteps(rw: RealWorld, n: number): Step[] {
     lead: rw.problem,
     body: (
       <>
+        <TermHelp slug={slug} texts={[rw.title, rw.problem, rw.whyHard, ...rw.steps, rw.takeaway]} />
         <Ladder steps={rw.steps.map((st, j) => { const { title, detail } = splitBullet(st); return { label: title, sub: detail || undefined, tone: j === rw.steps.length - 1 ? "ok" : "accent" }; })} />
         <Hidden label="Why it feels hard">
           <p className="small">{inline(rw.whyHard)}</p>
@@ -214,6 +227,7 @@ function realWorldSteps(rw: RealWorld, n: number): Step[] {
       title: "Solution: " + rw.title,
       body: (
         <>
+          <TermHelp slug={slug} texts={[rw.sql, rw.code?.src, rw.takeaway]} />
           {rw.sql && <SqlRunner sql={rw.sql} title="Press Run" explain />}
           {rw.code && <Code ex={rw.code} />}
           <Callout kind="tip" label="Takeaway:" text={rw.takeaway} />
@@ -223,7 +237,7 @@ function realWorldSteps(rw: RealWorld, n: number): Step[] {
   return out;
 }
 
-function practiceStep(p: Practice, i: number, id: string): Step {
+function practiceStep(p: Practice, i: number, id: string, slug: string): Step {
   return {
     ref: `practice-${i + 1}`,
     kind: "practice",
@@ -231,6 +245,7 @@ function practiceStep(p: Practice, i: number, id: string): Step {
     title: p.q,
     body: (
       <>
+        <TermHelp slug={slug} texts={[p.q, p.hint, p.explain, p.sql, p.starter]} compact />
         {p.sql && <SqlRunner sql={p.starter ?? "-- write your query here\n"} solution={p.sql} draftKey={`fsm-draft-${id}-${i}`} />}
         <TapCards
           items={[
@@ -248,7 +263,7 @@ function practiceStep(p: Practice, i: number, id: string): Step {
   };
 }
 
-function interviewSteps(items: Interview[]): Step[] {
+function interviewSteps(items: Interview[], slug: string): Step[] {
   const out: Step[] = [];
   for (let i = 0; i < items.length; i += 3) {
     const chunk = items.slice(i, i + 3);
@@ -259,9 +274,12 @@ function interviewSteps(items: Interview[]): Step[] {
       title: chunk.length === 1 ? "One interview question" : `${chunk.length} interview questions`,
       lead: "Tap each one, say your answer out loud, then compare.",
       body: (
-        <TapCards
-          items={chunk.map((q) => ({ q: interviewQuestion(q), a: interviewAnswer(q), tag: interviewTag(q) }))}
-        />
+        <>
+          <TermHelp slug={slug} texts={chunk.flatMap((q) => [q.q, q.a, q.sql])} compact />
+          <TapCards
+            items={chunk.map((q) => ({ q: interviewQuestion(q), a: interviewAnswer(q), tag: interviewTag(q) }))}
+          />
+        </>
       ),
     });
   }
@@ -315,12 +333,12 @@ export function buildSteps(topic: Topic, courseId: string, next: Topic | undefin
       </>
     ),
   });
-  topic.sections.forEach((s, i) => steps.push(...sectionSteps(s, i + 1)));
+  topic.sections.forEach((s, i) => steps.push(...sectionSteps(s, i + 1, topic.slug)));
   const quiz = topic.quiz ?? [];
   quiz.forEach((q, i) => steps.push(quizStep(q, i, quiz.length, quizState[i] ?? null, (c) => setQuiz(i, c))));
-  topic.realWorld?.forEach((rw, i) => steps.push(...realWorldSteps(rw, i + 1)));
-  topic.practice.forEach((p, i) => steps.push(practiceStep(p, i, id)));
-  steps.push(...interviewSteps(topic.interview));
+  topic.realWorld?.forEach((rw, i) => steps.push(...realWorldSteps(rw, i + 1, topic.slug)));
+  topic.practice.forEach((p, i) => steps.push(practiceStep(p, i, id, topic.slug)));
+  steps.push(...interviewSteps(topic.interview, topic.slug));
   const answered = quiz.filter((_, i) => quizState[i] !== undefined).length;
   const correct = quiz.filter((q, i) => quizState[i] === q.answer).length;
   steps.push({

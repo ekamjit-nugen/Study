@@ -9,6 +9,7 @@ import { Callout, Code, DataTable, More, TapCards, Tldr, Words } from "./Bits";
 import { Diagram } from "./Diagrams";
 import SqlRunner from "./SqlRunner";
 import { interviewAnswer, interviewQuestion, interviewTag } from "./InterviewCard";
+import TermHelp from "./TermHelp";
 import { Ladder, Visual, splitBullet } from "./Visuals";
 
 type Mode = "visual" | "full";
@@ -38,10 +39,11 @@ function Hidden({ label, children }: { label: string; children: React.ReactNode 
   );
 }
 
-function SectionView({ s, n, mode }: { s: Section; n: number; mode: Mode }) {
+function SectionView({ s, n, mode, slug }: { s: Section; n: number; slug: string; mode: Mode }) {
   const hasPicture = !!(s.diagram || s.visual);
   return (
     <section className="section">
+      <TermHelp slug={slug} texts={[s.title, s.ask, s.analogy, s.why, s.body, s.tip, s.warn, s.more, ...(s.bullets ?? []), ...(s.sql ?? []).map((q) => q.sql + "\n" + (q.note ?? "")), ...(s.code ?? []).map((c) => c.src)]} />
       <h2>
         <span className="n">{n}.</span> {inline(s.title)}
       </h2>
@@ -81,9 +83,10 @@ function SectionView({ s, n, mode }: { s: Section; n: number; mode: Mode }) {
   );
 }
 
-function RealWorldView({ rw, mode }: { rw: RealWorld; mode: Mode }) {
+function RealWorldView({ rw, mode, slug }: { rw: RealWorld; slug: string; mode: Mode }) {
   return (
     <div className="card rw">
+      <TermHelp slug={slug} texts={[rw.title, rw.problem, rw.whyHard, ...rw.steps, rw.sql, rw.code?.src, rw.takeaway]} />
       <h3>{inline(rw.title)}</h3>
       <p className="problem">{inline(rw.problem)}</p>
       {mode === "full" ? (
@@ -138,14 +141,14 @@ export default function TopicView({ course, module, topic, prev, next }: { cours
       {topic.words && <Words words={topic.words} />}
 
       {topic.sections.map((s, i) => (
-        <SectionView key={i} s={s} n={i + 1} mode={mode} />
+        <SectionView key={i} s={s} n={i + 1} mode={mode} slug={topic.slug} />
       ))}
 
       {topic.realWorld && topic.realWorld.length > 0 && (
         <section className="section">
           <h2>Hard in real life, easy here</h2>
           {topic.realWorld.map((rw, i) => (
-            <RealWorldView key={i} rw={rw} mode={mode} />
+            <RealWorldView key={i} rw={rw} mode={mode} slug={topic.slug} />
           ))}
         </section>
       )}
@@ -155,6 +158,7 @@ export default function TopicView({ course, module, topic, prev, next }: { cours
         <p className="small muted">Answers are always visible. Tap a question to see the answer and why.</p>
         {topic.practice.map((p, i) => (
           <div className="card practice" key={i}>
+            <TermHelp slug={topic.slug} texts={[p.q, p.hint, p.explain, p.sql, p.starter]} compact />
             <TapCards items={[{ q: p.q, a: `**Answer:** ${p.answer}\n\n**Why:** ${p.explain}` }]} />
             {p.sql && <SqlRunner sql={p.starter ?? "-- write your query here\n"} solution={p.sql} draftKey={`fsm-draft-${id}-${i}`} />}
             {p.sql && (
@@ -168,6 +172,7 @@ export default function TopicView({ course, module, topic, prev, next }: { cours
 
       <section className="section interview">
         <h2>Interview questions</h2>
+        <TermHelp slug={topic.slug} texts={topic.interview.flatMap((q) => [q.q, q.a, q.sql])} compact />
         <TapCards
           items={topic.interview.map((q) => ({ q: interviewQuestion(q), a: interviewAnswer(q), tag: interviewTag(q) }))}
         />

@@ -22,6 +22,8 @@ export const SQL_TOOLKIT: Topic = {
     ["NULLIF", "NULL when the two arguments are equal, otherwise the first"],
     ["pivot", "turning rows into columns, usually with SUM(CASE WHEN …)"],
     ["half-open range", "start included, end excluded: >= start AND < end"],
+    ["IIF(cond, a, b)", "a short if/else: a when the condition holds, else b (SQLite and SQL Server; CASE WHEN elsewhere)"],
+    ["printf('%05.2f', x)", "formats a value as text the way C's printf does: padding, decimals, repeated characters"],
   ],
   sections: [
     {
