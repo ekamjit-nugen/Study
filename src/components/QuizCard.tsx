@@ -13,7 +13,9 @@ export function QuizCard({ quiz, chosen, onChoose }: { quiz: Quiz; chosen: numbe
     if (needReason) setPending(i);
     else onChoose(i);
   };
-  const feedback = answered ? (quiz.whyOptions?.[chosen!] ?? (chosen === quiz.answer ? quiz.why : `Not quite. ${quiz.why}`)) : "";
+  const raw = answered ? (quiz.whyOptions?.[chosen!] ?? quiz.why) : "";
+  // the card prints its own "Correct." / "Not quite." label, so drop a duplicate from the text
+  const feedback = raw.replace(/^(Correct|Not quite|Right|Wrong)[.!:]\s*/i, "");
   return (
     <div className="quiz">
       {quiz.setup && (
