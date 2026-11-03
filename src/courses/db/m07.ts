@@ -7,6 +7,7 @@ export const M07: Module = {
   topics: [
     {
       slug: "classic-hard-sql-problems",
+      guided: true,
       title: "The classic hard SQL problems, each with its trick",
       minutes: 30,
       story: "Chess has openings. Once you know the ten common ones, most games start familiar. These are the openings of SQL interviews: each looks unique until you see the pattern underneath.",
@@ -17,7 +18,15 @@ export const M07: Module = {
       ],
       sections: [
         {
+          title: "'Second highest salary' and the tie nobody mentioned",
+          analogy: "Second place in a race where two runners tied for first.",
+          why: "The simplest-looking interview question hides the one rule interviewers listen for: ties.",
+          ask: "Salaries: 250,000 · 180,000 · 180,000 · 150,000. The interviewer asks for the THIRD highest salary. You write `ORDER BY salary DESC LIMIT 1 OFFSET 2`. What comes back, and is it the third highest salary?",
+          body: "180,000 comes back, and it is wrong. Two people share 180,000, so OFFSET 2 lands on the second of them. The third highest *distinct* salary is 150,000.\n\n| salary | ROW_NUMBER | RANK | DENSE_RANK |\n|---|---|---|---|\n| 250,000 | 1 | 1 | 1 |\n| 180,000 | 2 | 2 | 2 |\n| 180,000 | 3 | 2 | 2 |\n| 150,000 | 4 | 4 | **3** |\n\nOFFSET counts rows; DENSE_RANK counts distinct values. The question is about values, so DENSE_RANK = 3 is the answer, and it returns everyone at that level.\n\nSay the tie rule out loud before writing SQL, and the question answers itself. Every 'hard' SQL question has a rule like that at its centre. This topic is the catalogue: recognise the pattern, state the tie and NULL rules, then write it.",
+        },
+        {
           title: "Pattern map",
+          ask: "An interviewer says: 'find users who logged in on three consecutive days'. Before writing SQL, which pattern is this, and what is the one trick that turns 'consecutive' into a GROUP BY?",
           analogy: "Chess openings: ten patterns cover most games.",
           why: "Recognising the pattern is most of solving a 'hard' SQL question.",
           table: {
@@ -35,6 +44,12 @@ export const M07: Module = {
               ["cumulative distinct users / retention", "first-seen date", "MIN(date) per user, then count by first date"],
             ],
           },
+        },
+        {
+          title: "Connect it back: say the rule first",
+          analogy: "Name the opening before you move a piece.",
+          why: "Naming the pattern and the tie rule is most of the marks.",
+          body: "'Third highest salary, treating equal salaries as one rank' →\n\n```sql\nWITH r AS (SELECT name, salary, DENSE_RANK() OVER (ORDER BY salary DESC) AS rk FROM employees)\nSELECT name, salary FROM r WHERE rk = 3;\n```\n\nIt returns everyone at that level, never skips a rank, and never depends on which tied row happens to come first. The same discipline, pattern first, then tie and NULL rules, then SQL, solves every problem in this catalogue.",
         },
       ],
       realWorld: [
@@ -245,6 +260,7 @@ SELECT user_id, MAX(len) AS longest FROM runs GROUP BY user_id ORDER BY user_id;
 
     {
       slug: "system-design-with-databases",
+      guided: true,
       title: "System design rounds: the database part",
       minutes: 24,
       story: "An architect does not start with 'which bricks'. They ask who lives there, how many, and what they do all day. Then the floor plan, then the materials. Database design in an interview is the same order.",
@@ -256,7 +272,15 @@ SELECT user_id, MAX(len) AS longest FROM runs GROUP BY user_id ORDER BY user_id;
       ],
       sections: [
         {
+          title: "'Ten million users, so we shard from day one'",
+          analogy: "Buying a second building before the first floor is furnished.",
+          why: "Interviewers plant this line to see whether you size things or just repeat big words.",
+          ask: "The interviewer says: 'We expect ten million users, so we will shard the database from day one.' Before agreeing, what two numbers do you ask for, and what would make one Postgres primary enough?",
+          body: "Ask for the **write rate** and the **hot working set**, because those, not the user count, decide whether one primary is enough.\n\n| measure | ten million users means… | one Postgres primary handles… |\n|---|---|---|\n| profile data | ~10 M rows × 200 B ≈ 2 GB | hundreds of GB |\n| daily writes | say 5 M posts/day ≈ 60/s average, 600/s peak | thousands per second |\n| hot reads | feeds, profiles | tens of thousands/s, more with replicas and cache |\n\nTen million users is a few gigabytes of profiles and a few hundred writes per second at peak. One primary with replicas and a cache carries that with room to spare. Sharding on day one would cost cross-shard joins and transactions for a problem that does not exist yet.\n\nThe right answer is a method, not a store. Seven steps, in order, with the numbers to back each choice. That is this topic.",
+        },
+        {
           title: "The 7-step script",
+          ask: "You are asked to design the data layer for a ride-hailing app. What is the very first thing you write down, before any table, and why does everything else depend on it?",
           analogy: "An architect's order: who lives here and what they do, then the floor plan, then the materials.",
           why: "Interviewers score the order and trade-offs, not the final table list.",
           diagram: "designSteps",
@@ -272,6 +296,7 @@ SELECT user_id, MAX(len) AS longest FROM runs GROUP BY user_id ORDER BY user_id;
         },
         {
           title: "Back-of-envelope numbers",
+          ask: "1 million rides a day, 300 bytes a row plus indexes, kept 3 years. Roughly how much storage, and does that number change whether you partition, replicate or shard?",
           analogy: "Knowing roughly how much a lorry carries before planning deliveries.",
           why: "Rough numbers decide whether one database is enough.",
           table: {
@@ -347,6 +372,12 @@ SELECT user_id, MAX(len) AS longest FROM runs GROUP BY user_id ORDER BY user_id;
             "'Before sharding I'd exhaust indexes, caching, replicas and partitioning.'",
             "'Reads that need my own fresh write go to the primary; everything else can lag.'",
           ],
+        },
+        {
+          title: "Connect it back: what you say instead of 'shard'",
+          analogy: "Furnish the first floor; keep the plans for a second building in a drawer.",
+          why: "The sentence interviewers want: size it, scale the cheap ways first, keep sharding possible.",
+          body: "'Ten million users is a few gigabytes of profile data and a few hundred writes a second at peak; one Postgres primary handles that. I would add read replicas and a cache for the hot reads, partition the event tables by month, and keep a user_id on every table so sharding by user is a migration, not a rewrite, if the write rate ever demands it.'\n\nAccess patterns first, then schema, indexes, scale, consistency. Say the trade-off with every choice.",
         },
       ],
       realWorld: [

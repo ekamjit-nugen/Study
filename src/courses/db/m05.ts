@@ -7,6 +7,7 @@ export const M05: Module = {
   topics: [
     {
       slug: "acid-in-practice",
+      guided: true,
       title: "ACID in practice",
       minutes: 14,
       story: "Moving money between two jars. You must not end with the coins in the air (atomic), the total must stay the same (consistent), nobody should see one jar empty and the other not yet full (isolated), and once you say 'done' an earthquake cannot undo it (durable).",
@@ -24,6 +25,13 @@ export const M05: Module = {
       ],
       sections: [
         {
+          title: "COMMIT said OK, then the power went",
+          analogy: "Writing the transfer in the notebook before touching the jars.",
+          why: "Durability is the promise customers rely on without knowing its name.",
+          ask: "Your app runs a transaction that records a ₹5,000 payment. The database replies 'COMMIT OK'. Ten milliseconds later the server loses power. The data pages on disk were not updated yet. When the database restarts, is the payment there?",
+          body: "Yes. Before replying OK, the database appended the change to the **write-ahead log** and forced that log onto the disk (fsync). The data pages are updated later, at leisure. On restart it replays the log and the payment is back.\n\n| moment | WAL on disk | data pages on disk | after restart |\n|---|---|---|---|\n| before COMMIT | no | no | nothing |\n| COMMIT returns OK | **yes** | no | **payment present** |\n| checkpoint later | yes | yes | payment present |\n\nThat is the D in ACID. The other three letters are promises of the same kind: what the database guarantees so that your code does not have to. Let's take them one at a time, with a transfer you can run.",
+        },
+        {
           title: "The four promises on one transfer",
           analogy: "Moving money between jars with a witness, a rulebook, a curtain and a notebook: all or nothing, rules kept, nobody peeks halfway, written down for good.",
           why: "ACID is the vocabulary every database interview starts with.",
@@ -31,6 +39,7 @@ export const M05: Module = {
         },
         {
           title: "Atomicity you can see",
+          ask: "A transaction debits account 1, and the app crashes before the credit to account 2 and before COMMIT. When the database notices the connection is gone, what does it do with the debit?",
           analogy: "Dropping the coins halfway between jars and finding them back in the first jar.",
           why: "Without atomicity a crash loses money.",
           visual: {"kind": "flow", "steps": [{"label": "BEGIN", "tone": "accent"}, {"label": "UPDATE A −100", "sub": "not visible to others"}, {"label": "crash / ROLLBACK", "tone": "bad"}, {"label": "A unchanged", "sub": "as if nothing happened", "tone": "ok"}], "caption": "The database wrote undo information before touching the row, so it can always go back."},
@@ -80,6 +89,7 @@ SELECT id, balance FROM accounts WHERE id = 2;`,
         },
         {
           title: "Durability and what COMMIT really waits for",
+          ask: "If COMMIT waited for the data pages to be written, commits would be slow and random. What single sequential write does it wait for instead?",
           analogy: "Writing the transfer in the notebook before touching the jars, so a power cut cannot lose it.",
           why: "COMMIT means 'safe on disk', and that costs a disk write.",
           diagram: "wal",
@@ -123,6 +133,12 @@ await withTx(pool, async (c) => {
             },
           ],
           warn: "Keep transactions short. No HTTP calls, no sleeping, no waiting for user input inside one. Locks are held until COMMIT.",
+        },
+        {
+          title: "Connect it back: why COMMIT is slow and safe",
+          analogy: "One line in the logbook is enough; the shelves can be tidied later.",
+          why: "You can now explain every ACID letter with one transfer and one power cut.",
+          body: "- **Atomic:** the debit without the credit is rolled back; both or neither.\n- **Consistent:** `CHECK (balance >= 0)` and your invariants hold at COMMIT.\n- **Isolated:** nobody sees the debit before the credit.\n- **Durable:** COMMIT returns only after the WAL record is on disk; a power cut cannot lose it.\n\nThe price of durability is one fsync per commit. `synchronous_commit = off` skips the wait and may lose the last few milliseconds of commits: fine for logs, never for payments.",
         },
       ],
       realWorld: [
@@ -189,6 +205,7 @@ SELECT id, balance FROM accounts WHERE id IN (1, 3) ORDER BY id;`,
 
     {
       slug: "isolation-levels",
+      guided: true,
       title: "Isolation levels: step through the anomalies",
       minutes: 22,
       story: "Two people editing the same spreadsheet. Do you see their keystrokes live (uncommitted)? Only when they press Save (committed)? A photo of the sheet from when you opened it (repeatable)? Or do you take turns (serializable)?",
@@ -207,6 +224,13 @@ SELECT id, balance FROM accounts WHERE id IN (1, 3) ORDER BY id;`,
       ],
       sections: [
         {
+          title: "The nightly report that did not add up",
+          analogy: "Reading the first page of a ledger, someone edits page three, you read page three.",
+          why: "Isolation levels decide which impossible results your reports can show.",
+          ask: "A nightly job reads total revenue (₹4,138), then reads revenue per customer, then checks that the per-customer rows sum to the total. The check fails by ₹303. No code changed. What happened between the two reads?",
+          body: "An order was committed by someone else between the first read and the second. Under the default level, READ COMMITTED, every statement sees the latest committed data, so the second read saw an order the first read did not.\n\n| time | report job | checkout |\n|---|---|---|\n| 1 | reads total: ₹4,138 | |\n| 2 | | order 25 for ₹303 commits |\n| 3 | reads per-customer rows: sum ₹4,441 | |\n| 4 | **mismatch: ₹303** | |\n\nBoth reads were correct at their own moment. The report wanted both reads to see the *same* moment: one snapshot for the whole transaction. That is one isolation level up. Each level is a different answer to 'how much of other people's work can I see?'. Let's simulate them.",
+        },
+        {
           title: "Simulate it: pick an anomaly, pick a level, step through",
           analogy: "Two people editing the same spreadsheet: do you see each keystroke, each save, a frozen photo, or take turns?",
           why: "Isolation levels decide which weird results your app can see under load.",
@@ -214,6 +238,7 @@ SELECT id, balance FROM accounts WHERE id IN (1, 3) ORDER BY id;`,
         },
         {
           title: "What each level means",
+          ask: "The report job sets REPEATABLE READ and runs the same two reads. The checkout still commits between them. What does the second read see now, and why?",
           analogy: "Four settings on the same dial, from 'see everything live' to 'take turns'.",
           why: "Knowing the default of your database tells you which bugs you already have.",
           diagram: "levelsLadder",
@@ -250,6 +275,7 @@ SELECT changes() AS rows_updated;   -- 1 = ok, 0 = someone else changed it → r
         },
         {
           title: "Write skew: the one that REPEATABLE READ cannot catch",
+          ask: "Two doctors each check 'at least one other doctor is on call', both see yes, both go off call. Neither transaction touched the other's row. Why does REPEATABLE READ not stop this, and what does?",
           analogy: "Two doctors each checking 'someone else is on call' and both going home.",
           why: "Rules that span rows need serializable or a shared lock.",
           diagram: "writeSkew",
@@ -289,6 +315,12 @@ UPDATE doctors SET on_call = false WHERE id = :me;
             },
           ],
           tip: "Make the transaction body idempotent and free of side effects (no emails inside), so retrying it is safe.",
+        },
+        {
+          title: "Connect it back: the report adds up",
+          analogy: "Take a photo of the ledger and read every page from the photo.",
+          why: "Pick the level per transaction: a snapshot for reports, atomic updates or locks for writes, serializable for rules across rows.",
+          body: "```sql\nBEGIN ISOLATION LEVEL REPEATABLE READ;\nSELECT SUM(…) …;            -- total\nSELECT customer_id, SUM(…); -- per customer, same snapshot\nCOMMIT;\n```\n\nBoth reads now see the database as it was at the first statement; the checkout's order appears in neither, and the sums match. Nothing is locked and nobody waits: the report simply reads an older photo.\n\nWrites are the other half: lost updates need an atomic UPDATE, a version column or a row lock; rules across rows need SERIALIZABLE with retries.",
         },
       ],
       realWorld: [
@@ -344,6 +376,7 @@ SELECT id, owner, version FROM accounts WHERE id = 2;`,
 
     {
       slug: "locks-mvcc-deadlocks",
+      guided: true,
       title: "Locks, MVCC and deadlocks",
       minutes: 20,
       story: "A library book. MVCC is a photocopier: readers each get a copy of the page as it was, while the editor marks up the original. Locks are the 'do not touch' sign the editor puts on the chapter.",
@@ -362,6 +395,13 @@ SELECT id, owner, version FROM accounts WHERE id = 2;`,
         ["advisory lock", "an application-defined lock on a number, not on a row"],
       ],
       sections: [
+        {
+          title: "Two transfers that waited for each other forever",
+          analogy: "Two people each holding one chopstick and waiting for the other's.",
+          why: "Deadlocks are normal at scale; code that does not expect them is the bug.",
+          ask: "Transfer A moves money from account 1 to account 2 and locks row 1 first. Transfer B moves money from 2 to 1 and locks row 2 first. They start at the same moment. What is each one waiting for one second later?",
+          body: "Each is waiting for the row the other holds.\n\n| time | Transfer A | Transfer B |\n|---|---|---|\n| 1 | locks row 1 | locks row 2 |\n| 2 | wants row 2 → **waits for B** | wants row 1 → **waits for A** |\n| 3 | still waiting | still waiting |\n\nNeither can finish, so neither releases, so neither can finish. A **deadlock**. After about a second the database notices the cycle and kills one of them with an error; the other completes.\n\nTo understand why rows get held at all, and how to avoid the cycle, we need to see how the database lets readers and writers share rows: MVCC and locks.",
+        },
         {
           title: "MVCC: readers and writers do not fight",
           analogy: "A photocopier: readers get a copy of the page as it was while the editor marks up the original.",
@@ -392,6 +432,7 @@ SELECT id, owner, version FROM accounts WHERE id = 2;`,
         },
         {
           title: "Pessimistic vs optimistic",
+          ask: "A user opens a document, edits for 20 minutes, and saves. A row lock would hold the row for 20 minutes across many HTTP requests. What do you check at save time instead?",
           analogy: "Booking a seat by holding it while you decide, versus deciding freely and checking the seat is still free when you pay.",
           why: "Pick wrong and you either block everyone or lose edits.",
           diagram: "optimisticVsPessimistic",
@@ -426,6 +467,7 @@ UPDATE products SET stock = 6, version = 2 WHERE id = 4 AND version = 1;
         },
         {
           title: "Deadlocks",
+          ask: "Both transfers are changed to lock the lower account id first, always. Transfer A locks 1 then 2; Transfer B now also locks 1 then 2. What happens at time 2 instead of a deadlock?",
           analogy: "Two people each holding one chopstick and waiting for the other's.",
           why: "Deadlocks are normal at scale; unhandled ones are bugs.",
           diagram: "locks",
@@ -467,6 +509,12 @@ RETURNING j.*;`,
             },
           ],
           tip: "Advisory locks (`pg_advisory_xact_lock(key)`) lock an arbitrary number: perfect for 'only one process runs this cron' or 'serialise per-tenant imports' without a row to lock.",
+        },
+        {
+          title: "Connect it back: the transfers that no longer deadlock",
+          analogy: "Everyone picks up the left chopstick first.",
+          why: "Consistent lock order prevents the cycle; a retry handles the rare one that remains.",
+          body: "```sql\nSELECT * FROM accounts WHERE id IN (:from, :to) ORDER BY id FOR UPDATE;   -- same order for everyone\nUPDATE accounts SET balance = balance - :amt WHERE id = :from;\nUPDATE accounts SET balance = balance + :amt WHERE id = :to;\n```\n\nTransfer B now waits for A to finish with row 1, then proceeds. No cycle, no deadlock. And because other code paths may still conflict, the app catches error 40P01 and retries the whole transaction with a small random backoff.",
         },
       ],
       realWorld: [

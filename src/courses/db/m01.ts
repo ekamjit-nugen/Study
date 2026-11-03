@@ -7,6 +7,7 @@ export const M01: Module = {
   topics: [
     {
       slug: "what-is-a-database",
+      guided: true,
       title: "What a database is, and why not just files",
       minutes: 12,
       story: "A pile of paper on a desk is data. A library is a database: every book has a place, a catalogue finds it in seconds, two people can borrow different books at once, and nobody can tear out half a page and walk off.",
@@ -25,6 +26,13 @@ export const M01: Module = {
       ],
       sections: [
         {
+          title: "The shop that ran on a spreadsheet",
+          analogy: "A notebook on the counter that everyone writes in at once.",
+          why: "Until you feel why a file is not enough, every database rule looks like bureaucracy.",
+          ask: "Your shop keeps orders in one spreadsheet. On a busy day the app saves it 200 times an hour. The laptop loses power halfway through one save. When it comes back, what does the order file look like?",
+          body: "Half a file. The rows that were written before the power cut are there; the rest are gone or garbled, and nothing tells you which.\n\nThat is one of four things a plain file cannot promise:\n\n| What happens | With a file | With a database |\n|---|---|---|\n| Power cut mid-save | half the data | the change is all there or not at all |\n| Two people save at once | one person's change is lost | both changes kept, in order |\n| Find one order in a million | read everything | a few page reads via an index |\n| Someone types 'abc' as a price | accepted | refused by a rule |\n\nA **database** is a program that stores your data *and keeps those four promises*. Everything in this course is one of them explained.\n\nLet's look at each promise with the shop data.",
+        },
+        {
           title: "The four promises a file cannot keep",
           analogy: "A shared notebook on a desk: two people write at once and overwrite each other, a spilled coffee ruins half a page, and finding one name means flipping every page. A library fixes all four: a desk clerk, a catalogue, and rules about what goes on the shelf.",
           why: "Without these promises your app loses sales, double-charges, or slows to a crawl the day it gets busy.",
@@ -39,6 +47,7 @@ export const M01: Module = {
         },
         {
           title: "What happens when you run a query",
+          ask: "Your Node code calls `db.query('SELECT …')`. Before any row comes back, how many different 'places' does that query pass through?",
           analogy: "Ordering food: you tell the waiter (driver) what you want, the kitchen (server) decides how to cook it (planner), and the pantry (disk) is only opened when the fridge (RAM cache) does not have it.",
           why: "When something is slow, you need to know which of these steps is slow before you can fix it.",
           body: "Your Node code never touches a file. It opens a network connection and sends SQL text. The server does the real work.",
@@ -54,6 +63,7 @@ export const M01: Module = {
         },
         {
           title: "SQL is declarative: say what, not how",
+          ask: "You want the names of customers from India, sorted. In JavaScript you would write a loop and a sort. What do you write in SQL, and who decides how to run it?",
           analogy: "Telling a taxi driver 'the airport' instead of turn-by-turn directions. The driver picks the route, and a better route tomorrow needs no new instructions from you.",
           why: "This is why adding an index speeds up code you never touched, and why you should describe results, not steps.",
           visual: {"kind": "flow", "steps": [{"label": "You: WHAT", "sub": "SELECT name … WHERE country='India'", "tone": "accent"}, {"label": "Parser", "sub": "checks syntax"}, {"label": "Planner: HOW", "sub": "index seek or full scan? (its choice)", "tone": "warn"}, {"label": "Executor", "sub": "runs the plan"}, {"label": "rows", "sub": "sorted names", "tone": "ok"}], "caption": "Add an index tomorrow and the same query gets faster with no code change: only the HOW changed."},
@@ -119,6 +129,12 @@ LIMIT 5;`,
           },
           tip: "Interview answer in one line: 'Start with Postgres. Add a specialised store when a measured need appears, and keep Postgres as the source of truth.'",
         },
+        {
+          title: "Connect it back: what the spreadsheet shop needed",
+          analogy: "The notebook becomes a library with a desk clerk, a catalogue and rules.",
+          why: "This is the one-paragraph answer to 'why do we need a database at all'.",
+          body: "Go back to the shop. Each thing that went wrong maps to one promise:\n\n1. Power cut mid-save → a **transaction**: the order is written completely or not at all.\n2. Two saves at once → **concurrency control**: both orders survive.\n3. Finding one order among a million → an **index**: a few page reads.\n4. 'abc' as a price → a **constraint**: refused at the door.\n\nYou do not get these from a cleverer file format. You get them from a database, and the rest of this course is how to use each one well.",
+        },
       ],
       realWorld: [
         {
@@ -173,6 +189,7 @@ SELECT id, name, stock FROM products WHERE id = 3;`,
 
     {
       slug: "tables-keys-relationships",
+      guided: true,
       title: "Tables, keys and relationships",
       minutes: 18,
       story: "A passport number identifies one person. Your visa points at that passport number. If the passport does not exist, the visa is meaningless. That is a primary key, a foreign key, and referential integrity.",
@@ -191,6 +208,13 @@ SELECT id, name, stock FROM products WHERE id = 3;`,
       ],
       sections: [
         {
+          title: "The order for a customer who does not exist",
+          analogy: "A visa stamped for a passport number nobody holds.",
+          why: "Orphan rows are how reports stop adding up, quietly, for months.",
+          ask: "A support script inserts an order with `customer_id = 404`. There is no customer 404. The next morning, the revenue report groups orders by customer. Where does that order's money appear?",
+          body: "Nowhere. The report joins orders to customers; order 404 has no customer to join to, so it silently drops out. Total revenue is now lower than the money in the bank, and nobody knows why.\n\n| orders.id | customer_id | customers.id exists? | shows in report? |\n|---|---|---|---|\n| 1 | 1 | yes | yes |\n| 2 | 2 | yes | yes |\n| 3 | 404 | **no** | **no** |\n\nThe fix is not a smarter report. It is a rule in the table: `customer_id REFERENCES customers(id)`. With that rule the insert for customer 404 is refused at the door, by every script, forever.\n\nTo understand that rule we need three ideas: rows and columns, the key that names a row, and the key that points at a row somewhere else.",
+        },
+        {
           title: "Anatomy of a table",
           analogy: "A class register: one line per student (row), one column per fact (name, roll number), and the roll number never repeats (primary key).",
           why: "Every later idea, joins, indexes, constraints, is built on rows, columns and keys.",
@@ -199,6 +223,7 @@ SELECT id, name, stock FROM products WHERE id = 3;`,
         },
         {
           title: "Three relationship shapes",
+          ask: "Products have many tags and tags belong to many products. Where do you store that: a tags column on products, a products column on tags, or somewhere else?",
           analogy: "A person has one passport (1:1), a mother has many children (1:N), and students take many courses while courses have many students (M:N, needs a timetable in between).",
           why: "Pick the wrong shape and you end up with comma-separated lists in a cell that nobody can query.",
           diagram: "relationships",
@@ -243,6 +268,7 @@ SELECT COUNT(*) AS items_left FROM order_items WHERE order_id = 7;`,
         },
         {
           title: "NULL: the three-valued logic trap",
+          ask: "Liam's city is unknown, stored as NULL. You run `WHERE city = NULL` expecting to find him. How many rows come back, and why?",
           analogy: "A form field left blank. It is not zero and not an empty answer; it is 'we do not know'. You cannot say 'unknown equals unknown'.",
           why: "Almost every 'my WHERE returns nothing' bug is a NULL compared with =.",
           diagram: "nullLogic",
@@ -280,6 +306,12 @@ FROM employees;`,
             ],
           },
           more: "Why random UUIDs hurt: a B-tree index keeps keys sorted. Sequential ids always append to the rightmost leaf page, which stays hot in cache. Random ids land on random pages, so inserts touch and split pages all over the index. InnoDB (MySQL) stores the whole table in PK order, so the pain is even bigger there. UUID v7 puts a timestamp in the high bits, restoring locality.",
+        },
+        {
+          title: "Connect it back: order 404 cannot happen now",
+          analogy: "The passport office checks the number before stamping the visa.",
+          why: "You now have the one sentence that explains referential integrity.",
+          body: "With `customer_id INTEGER NOT NULL REFERENCES customers(id)` on orders:\n\n- the support script's insert for customer 404 fails with a foreign-key error,\n- the report cannot lose money, because every order has a customer to join to,\n- deleting a customer who has orders is refused (RESTRICT), unless you decided CASCADE on purpose.\n\nOne rule, declared once, protects every writer: API, cron job, admin console, and the script someone runs at 2 a.m.",
         },
       ],
       realWorld: [
@@ -357,6 +389,7 @@ ORDER BY e.id;`,
 
     {
       slug: "data-types-and-constraints",
+      guided: true,
       title: "Data types and constraints",
       minutes: 14,
       story: "A form with a free-text 'age' box gets 'twenty', '25 years' and '-3'. A form with a number box from 0 to 120 gets numbers. Types and constraints are that number box, enforced by the database for every app that will ever touch the data.",
@@ -374,6 +407,13 @@ ORDER BY e.id;`,
         ["JSONB", "Postgres's binary JSON column type, indexable"],
       ],
       sections: [
+        {
+          title: "The report that is off by a few paise",
+          analogy: "Writing one third as 0.33 and adding it three times.",
+          why: "Every row looks right; only the totals are wrong, which is the hardest kind of bug to find.",
+          ask: "Finance says the monthly total from the database is ₹12,345.67 but the payment gateway says ₹12,345.71. Every single payment row matches the gateway when you look at it. Where can four paise come from?",
+          body: "From the column type. The amounts are stored as FLOAT. A float cannot hold 19.99 exactly; it holds the nearest binary fraction, something like 19.989999999. Each row is off by less than a paisa, so each row *looks* right. Add 600 of them and the error becomes four paise.\n\n| Stored as | 0.1 + 0.2 | SUM of 600 × 19.99 |\n|---|---|---|\n| FLOAT | 0.30000000000000004 | off by paise |\n| NUMERIC(12,2) | 0.30 | exact |\n\nTypes are rules about what a column can hold. Pick the wrong one and the database happily stores something slightly wrong, forever.\n\nLet's see the three types people get wrong: numbers, text, and time.",
+        },
         {
           title: "Numbers: the float trap",
           analogy: "Writing one third as 0.33: close, but add it three times and you get 0.99, not 1. Floats do the same with 0.1.",
@@ -400,6 +440,7 @@ ORDER BY e.id;`,
         },
         {
           title: "Text, dates and time zones",
+          ask: "A user in Kolkata books a meeting at 9:00. You store the string '09:00'. A colleague in London opens it. What time do they see, and is that what the booker meant?",
           analogy: "Saying 'meet at 9' to a friend in another country without saying whose 9. Store the moment in one agreed clock (UTC) and translate when you show it.",
           why: "Wrong zone handling moves appointments by hours and corrupts reports across countries.",
           visual: {"kind": "flow", "steps": [{"label": "user in Kolkata", "sub": "types 09:00 IST", "tone": "accent"}, {"label": "timestamptz", "sub": "stored as 03:30 UTC", "tone": "ok"}, {"label": "user in London", "sub": "sees 04:30 BST", "tone": "accent"}], "caption": "Plain timestamp (no zone) stores '09:00' with no idea where that was: the classic 'meeting moved by 5.5 hours' bug."},
@@ -425,6 +466,7 @@ WHERE id IN (1, 24);`,
         },
         {
           title: "Constraints: rules the database enforces for everyone",
+          ask: "Your API validates every input. A nightly cron job and an admin console also write to the same table. Which of the three is checked by your API's validation?",
           analogy: "A bouncer at the door checks every guest, not just the ones who came through the main entrance. App validation is a friendly host; the constraint is the bouncer.",
           why: "Cron jobs, scripts and admin tools bypass your API; only constraints stop bad data from all of them.",
           diagram: "defenceLayers",
@@ -458,6 +500,12 @@ VALUES ('Dup', 'aarav@example.com', 'India', '2025-01-01');`,
             ],
           },
           warn: "A JSON column is not a schema. If you query a JSON field in WHERE every day, promote it to a real column.",
+        },
+        {
+          title: "Connect it back: the four paise",
+          analogy: "Replace the approximate ruler with a counting of coins.",
+          why: "This is the answer you give finance, and the migration you write.",
+          body: "The four paise were never in any row; they were the sum of 600 tiny rounding errors in a FLOAT column.\n\nThe fix:\n\n```sql\nALTER TABLE payments ALTER COLUMN amount TYPE numeric(12,2);\n```\n\nor store integer paise. Round only when you display, with the currency's rules.\n\nSame lesson for the other types: an instant is `timestamptz`, a birthday is `date`, an id from another system is `text`, and every rule you care about is a constraint the database checks for every writer.",
         },
       ],
       realWorld: [

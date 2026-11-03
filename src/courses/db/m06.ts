@@ -7,6 +7,7 @@ export const M06: Module = {
   topics: [
     {
       slug: "storage-internals",
+      guided: true,
       title: "Storage internals: pages, WAL, heaps and clustered indexes",
       minutes: 16,
       story: "A warehouse stores goods in fixed-size boxes on shelves. You never fetch one item; you fetch a box. A clever warehouse keeps the popular boxes near the door (buffer pool) and writes every delivery in a logbook before shelving it (WAL).",
@@ -24,6 +25,13 @@ export const M06: Module = {
         ["dead tuple", "an old row version nobody can see any more, waiting for VACUUM"],
       ],
       sections: [
+        {
+          title: "The table that is 50 GB but holds 5 GB",
+          analogy: "Crossing out old lines in a notebook without ever tearing out pages.",
+          why: "Row count looks fine, indexes exist, plans look right; only the physical layout explains the slowness.",
+          ask: "A sessions table gets updated on every request (last_seen_at). It holds 20 million live rows, about 5 GB of data, but is 50 GB on disk and every scan is ten times slower than it should be. Where are the other 45 GB?",
+          body: "Dead row versions. Every UPDATE in Postgres writes a *new* version of the row and leaves the old one behind as a dead tuple. VACUUM reclaims that space, but if it cannot keep up, the table fills with dead rows and every scan reads them.\n\n| | healthy | bloated |\n|---|---|---|\n| live rows | 20 M | 20 M |\n| dead rows | few | **hundreds of millions** |\n| pages read by a scan | 600 k | **6 M** |\n\nThe usual reason VACUUM fell behind: a long-running transaction kept an old snapshot alive, so the dead rows were still 'visible' to someone and could not be removed.\n\nTo see why updates leave old versions at all, we need to look at what is actually on disk: pages, the write-ahead log, and row versions.",
+        },
         {
           title: "Pages and the buffer pool",
           analogy: "A warehouse that moves whole boxes, never single items, and keeps popular boxes by the door.",
@@ -48,6 +56,7 @@ export const M06: Module = {
         },
         {
           title: "Heap vs clustered: why PK choice matters",
+          ask: "Postgres stores rows in a heap and indexes point at them; InnoDB stores the table inside the primary-key B-tree. Which one is hurt more by a random UUID primary key, and why?",
           analogy: "Loose papers in a drawer with an index card per paper (heap), versus a binder where the pages are the index (clustered).",
           why: "The same UUID choice is fine in Postgres and painful in MySQL.",
           diagram: "heapVsClustered",
@@ -64,6 +73,7 @@ export const M06: Module = {
         },
         {
           title: "Bloat and VACUUM (Postgres)",
+          ask: "You find a transaction that has been open for six hours. Why does that one transaction stop VACUUM from cleaning rows that nobody else can see?",
           analogy: "Crossing out old lines in a notebook without ever tearing out pages: the notebook grows while the real content does not.",
           why: "Bloat makes a 5 GB table cost 50 GB of reads.",
           diagram: "bloat",
@@ -87,6 +97,12 @@ export const M06: Module = {
               note: "Even this toy database is dozens of 4 KB pages. A B-tree index is just more pages.",
             },
           ],
+        },
+        {
+          title: "Connect it back: the table back to 5 GB",
+          analogy: "Tear out the crossed-out pages, then stop writing so much.",
+          why: "Update-heavy tables need VACUUM to keep up, and hot columns on wide rows make that hard.",
+          body: "1. Kill the six-hour transaction; set `idle_in_transaction_session_timeout` so it cannot recur.\n2. Make autovacuum more aggressive on this table (`autovacuum_vacuum_scale_factor = 0.01`).\n3. Rebuild online with `pg_repack` to return the 45 GB.\n4. Stop the churn: update `last_seen_at` at most once a minute, or move it to a narrow side table or Redis.\n\nScans drop back to 600,000 pages, and the table stays small because VACUUM can keep up.",
         },
       ],
       realWorld: [
@@ -146,6 +162,7 @@ SELECT pid, now() - xact_start AS age, query FROM pg_stat_activity WHERE xact_st
 
     {
       slug: "replication-failover-backups",
+      guided: true,
       title: "Replication, failover and backups",
       minutes: 16,
       story: "A newsroom with one editor (primary) and many printing presses (replicas). Every article goes to the editor; presses copy it seconds later. If the editor collapses, one press is promoted. The archive (backups) is in a different building.",
@@ -163,6 +180,13 @@ SELECT pid, now() - xact_start AS age, query FROM pg_stat_activity WHERE xact_st
         ["RPO / RTO", "how much data you may lose / how long you may be down"],
       ],
       sections: [
+        {
+          title: "'I changed my avatar and it changed back'",
+          analogy: "Posting a notice on the main board and then checking a photocopy printed a second earlier.",
+          why: "Replicas are the first scaling step most teams take, and this is the first bug they ship.",
+          ask: "A user uploads a new avatar, the write succeeds on the primary, the page reloads and shows the old avatar for a second or two. Support says 'the save button is broken'. The write is on the primary. What served the old avatar?",
+          body: "A replica that had not yet applied the write. The page reload read from a replica that was 800 ms behind the primary.\n\n| time | primary | replica | what the user sees |\n|---|---|---|---|\n| 0 ms | new avatar committed | old avatar | – |\n| 300 ms | new | **old** (lag) | reload → **old avatar** |\n| 900 ms | new | new | reload → new avatar |\n\nNothing is broken; the replica is simply a copy that arrives a little later. The bug is reading *your own fresh write* from a copy.\n\nReplicas give you read scaling and a standby for failover; they also give you lag and the question of what a backup really is. Let's take those in order.",
+        },
         {
           title: "How replication works and what goes wrong",
           analogy: "One editor and many printing presses copying each article seconds later.",
@@ -187,6 +211,7 @@ SELECT pid, now() - xact_start AS age, query FROM pg_stat_activity WHERE xact_st
         },
         {
           title: "Read-your-writes with replicas",
+          ask: "After a user writes, which reads must go to the primary, and for how long? What is the cheapest rule that gives that user a consistent view?",
           analogy: "Posting a notice on the main board and then checking a photocopy that was printed a second earlier.",
           why: "Users report 'my save did not work' when reads come from a lagging replica.",
           visual: {"kind": "flow", "steps": [{"label": "user saves profile", "sub": "→ primary", "tone": "accent"}, {"label": "next 5 s: that user's reads", "sub": "→ primary", "tone": "warn"}, {"label": "after that", "sub": "→ replica", "tone": "ok"}], "caption": "Alternative: remember the write's WAL position and only use a replica that has replayed past it."},
@@ -220,6 +245,7 @@ async function query(sql: string, params: unknown[], ctx: Ctx) {
         },
         {
           title: "Backups that actually restore",
+          ask: "Someone runs `DELETE FROM orders` without a WHERE at 14:03. You have two replicas and a nightly dump. Which of those can give you the orders as they were at 14:02?",
           analogy: "A fire drill: the evacuation plan is only real once you have walked it.",
           why: "An untested backup is a hope, not a plan.",
           diagram: "pitr",
@@ -233,6 +259,12 @@ async function query(sql: string, params: unknown[], ctx: Ctx) {
             ],
           },
           warn: "A replica is not a backup. `DELETE FROM users` replicates in milliseconds. Only PITR lets you go back to 'one minute before the mistake'.",
+        },
+        {
+          title: "Connect it back: the avatar stays new",
+          analogy: "Read the main board yourself for a moment after you pin something to it.",
+          why: "Replicas are eventually consistent; decide per read whether a few seconds old is acceptable.",
+          body: "Route reads by what they need:\n\n- the user's own fresh data, right after a write → the **primary** (for a few seconds, via a session timestamp), or wait until the replica's replay position passes the write's position;\n- lists, search, reports → a **replica**; lag is fine there.\n\nThe avatar now shows the new picture on the very next reload, and the replicas keep carrying the heavy read traffic they were added for.",
         },
       ],
       realWorld: [
@@ -282,6 +314,7 @@ async function query(sql: string, params: unknown[], ctx: Ctx) {
 
     {
       slug: "partitioning-and-sharding",
+      guided: true,
       title: "Partitioning and sharding",
       minutes: 16,
       story: "A filing cabinet with one giant drawer vs one drawer per year (partitioning). When the cabinet itself is full, you buy more cabinets and decide which cabinet holds whose files (sharding).",
@@ -300,7 +333,15 @@ async function query(sql: string, params: unknown[], ctx: Ctx) {
       ],
       sections: [
         {
+          title: "Two billion orders and a request to shard",
+          analogy: "One giant filing drawer, and someone proposing to buy a second building.",
+          why: "Sharding is the dramatic answer; most of the pain here has a smaller fix.",
+          ask: "The orders table has 2 billion rows, 3 TB, growing 5 million a day. Reports are slow, autovacuum never finishes, and the team wants to shard across four servers. Before buying servers: what is actually slow, and would four servers fix it?",
+          body: "Two different problems are tangled together, and neither is 'the server is too small'.\n\n| symptom | real cause | fix that is not sharding |\n|---|---|---|\n| reports over months of data are slow | every report scans one 3 TB table | **partition by month**: a report touches a few partitions |\n| autovacuum never finishes | one table, one vacuum, forever behind | partitions vacuum independently |\n| point lookups by customer are slow | indexes as large as the table | smaller indexes per partition, right composite index |\n| dashboards fight checkout for IO | OLTP and reporting on one box | **replicas / a columnar store** fed by CDC |\n\nSharding would split the table across servers, lose cross-shard joins and transactions, and still leave each shard with the same scan-everything reports. It is the right tool only when the **write rate** exceeds what one primary can take.\n\nLet's take the two tools in order: partitioning on one server, then sharding across servers, and the order in which to reach for them.",
+        },
+        {
           title: "Partitioning: same server, many pieces",
+          ask: "Orders are partitioned by month. A report asks for March 2025. Which partitions does the database open, and what happens to a query that has no date in its WHERE?",
           analogy: "One drawer per year instead of one giant drawer: find this year's files fast, throw away 2019 in one motion.",
           why: "Partitioning fixes size and retention without changing the application.",
           diagram: "partitioning",
@@ -356,6 +397,7 @@ DROP TABLE events_2024_07;`,
         },
         {
           title: "Before you shard",
+          ask: "List, in order, what you would try before sharding the orders table. Which of those steps changes the application code, and which do not?",
           analogy: "Tidy the drawer, add dividers, buy a bigger cabinet, then and only then buy a second one.",
           why: "Most systems never need to shard if the earlier steps are done.",
           diagram: "scaleLadder",
@@ -365,6 +407,12 @@ DROP TABLE events_2024_07;`,
             "7. Then shard the write-heavy table by tenant or user, with a directory so you can move tenants.",
             "Managed options: Citus (Postgres sharding), Vitess (MySQL), CockroachDB/Spanner/Yugabyte (distributed SQL that shards for you).",
           ],
+        },
+        {
+          title: "Connect it back: no second building yet",
+          analogy: "One drawer per month, a photocopier for reports, and the cabinet stays.",
+          why: "Partition for size and retention; replicas for read load; shard only for write load.",
+          body: "1. `PARTITION BY RANGE (ordered_at)` by month: reports prune to a few partitions; retention is `DROP TABLE orders_2022_01`; autovacuum works per piece.\n2. Composite indexes per query shape, now small per partition.\n3. Reporting on a replica or a columnar store fed by CDC.\n4. Only if the primary cannot take 5 million writes a day (it can, comfortably): shard by customer_id with a directory, co-locating order_items.\n\nThe team keeps one database, one backup story, and its joins.",
         },
       ],
       realWorld: [
@@ -416,6 +464,7 @@ DROP TABLE events_2024_07;`,
 
     {
       slug: "distributed-consistency",
+      guided: true,
       title: "Consistency across services: CAP, outbox, sagas, idempotency",
       minutes: 20,
       story: "Two friends planning dinner by text with a bad signal. If messages drop, you either refuse to decide until both agree (consistent, unavailable) or each decides and you fix it later (available, inconsistent). There is no third option while the signal is bad.",
@@ -435,6 +484,13 @@ DROP TABLE events_2024_07;`,
       ],
       sections: [
         {
+          title: "The confirmation email that never came (and sometimes came twice)",
+          analogy: "Writing the sale in the ledger and shouting it to the warehouse: if the shout fails, nobody ships; if the pen fails after the shout, they ship a phantom.",
+          why: "Every system that writes to a database and tells another system about it has this bug until it is designed away.",
+          ask: "Checkout commits the order, then publishes 'order.created' to the queue for the email service. Some customers get no email; a few get two. Each service's logs look fine. Where can an event be lost, and where can it be doubled?",
+          body: "In the gaps between two systems that cannot share a transaction.\n\n| sequence | outcome |\n|---|---|\n| commit succeeds, publish fails (network blip) | **no email**: the order exists, the event never left |\n| publish succeeds, commit fails | **phantom email** for an order that does not exist |\n| consumer sends the email, crashes before acknowledging | message redelivered → **two emails** |\n\nEach failure is in a gap, not in either service, which is why both logs look fine.\n\nThe database cannot commit the queue, and the queue cannot roll back the database. The fix is to write the event *where you write the data*, publish from there, and make the consumer harmless to repeat. Those are the three ideas in this topic.",
+        },
+        {
           title: "CAP and PACELC without the mysticism",
           analogy: "Two friends planning dinner by text with bad signal: wait until both agree, or each decide and fix it later.",
           why: "Every distributed design is one of these two choices during a partition.",
@@ -447,6 +503,7 @@ DROP TABLE events_2024_07;`,
         },
         {
           title: "The dual-write problem and the outbox",
+          ask: "Instead of publishing to the queue, checkout inserts a row into an outbox table in the same transaction as the order. What can no longer happen, and what new job has to exist?",
           analogy: "Writing the sale in the ledger and shouting it to the warehouse: if you shout first and the pen fails, the warehouse ships a phantom order.",
           why: "Lost and phantom events come from writing to two places separately.",
           diagram: "outbox",
@@ -490,6 +547,7 @@ DROP TABLE events_2024_07;`,
         },
         {
           title: "Idempotency everywhere",
+          ask: "The email consumer receives the same event twice. What must it record, in which transaction, so that the second delivery sends nothing?",
           analogy: "A lift button: pressing it five times calls one lift.",
           why: "Retries happen; without idempotency they double-charge.",
           diagram: "idempotency",
@@ -510,6 +568,12 @@ UPDATE inventory SET reserved = reserved + $2 WHERE sku = $3;`,
             "Queues: at-least-once delivery means every consumer dedupes by event id, in the same transaction as its effect.",
             "Payments: the provider's idempotency key is your order id. Retry freely.",
           ],
+        },
+        {
+          title: "Connect it back: exactly one email",
+          analogy: "Write the shout in the ledger; the warehouse reads the ledger and ticks each line once.",
+          why: "Outbox for lost events, dedupe for doubled ones, idempotency keys everywhere a retry can happen.",
+          body: "```sql\nBEGIN;\nINSERT INTO orders …;\nINSERT INTO outbox (id, topic, payload) VALUES (…, 'order.created', …);   -- same transaction\nCOMMIT;\n```\n\nA relay (or Debezium reading the WAL) publishes outbox rows and marks them sent: the event exists if and only if the order exists, so no lost or phantom emails. The consumer inserts the event id into `processed_events` in the same transaction as 'email sent'; a redelivery hits the primary key and is skipped, so no double emails.",
         },
       ],
       realWorld: [
@@ -571,6 +635,7 @@ SELECT COUNT(*) AS rows_stored FROM processed_events;`,
 
     {
       slug: "sql-vs-nosql",
+      guided: true,
       title: "SQL vs NoSQL: MongoDB, Redis and when each wins",
       minutes: 18,
       story: "A toolbox. A relational database is the adjustable spanner that fits most bolts. MongoDB is a power drill: wonderful for one job, awkward as a hammer. Redis is the magnet that grabs screws instantly but cannot hold your whole toolbox.",
@@ -589,6 +654,13 @@ SELECT COUNT(*) AS rows_stored FROM processed_events;`,
       ],
       sections: [
         {
+          title: "'SQL or NoSQL?' for a chat app",
+          analogy: "A toolbox, not one tool.",
+          why: "The question assumes one store; the right answer is per workload with one source of truth.",
+          ask: "A startup is building a chat app: user accounts and billing, messages (append-heavy, read per room), shopping carts that must survive a refresh, presence ('typing…'), and an analytics dashboard over 500 million events. The CTO asks: SQL or NoSQL? What do you answer?",
+          body: "'Which workload?' Each one has a different shape, and the shape picks the store.\n\n| workload | shape | store | why |\n|---|---|---|---|\n| accounts, billing | relationships, uniqueness, money | Postgres | joins, constraints, transactions |\n| messages | append-heavy, read by room and time, never joined across rooms | Postgres partitioned by month, Cassandra at extreme scale | sequential writes, one key |\n| carts | small, per user, must expire | Redis hash with TTL, written through at checkout | microsecond reads, expiry |\n| presence | tiny, lossy, short-lived | Redis with short TTLs | losing it is fine |\n| analytics | scans over 500 M events | a columnar store fed by events | OLTP and OLAP must not share a box |\n\nOne **source of truth** (Postgres), several **derived stores** fed from it. Let's look at how each kind of store thinks, so the table above makes sense rather than being memorised.",
+        },
+        {
           title: "Three shapes of the same order",
           analogy: "The same order as a filing cabinet (rows), a folder with everything inside (document), or a sticky note (key-value).",
           why: "Choosing the shape decides which questions are cheap to ask.",
@@ -596,6 +668,7 @@ SELECT COUNT(*) AS rows_stored FROM processed_events;`,
         },
         {
           title: "MongoDB: embed or reference?",
+          ask: "Blog posts and their comments: a viral post gets 100,000 comments. If comments are embedded inside the post document, what breaks, and what does the alternative look like?",
           analogy: "A folder with the receipt inside (embed) versus a note saying 'see customer file 7' (reference).",
           why: "Embedding unbounded lists hits the document size limit; referencing everything turns Mongo into a slow relational database.",
           diagram: "embedVsReference",
@@ -629,6 +702,7 @@ SELECT COUNT(*) AS rows_stored FROM processed_events;`,
         },
         {
           title: "Redis: data structures with a network",
+          ask: "You need 'no more than 100 requests per user per minute'. Why is a Redis counter with an expiry the right tool, and what would the same thing cost as a Postgres row?",
           analogy: "A very fast whiteboard with lists, counters and timers, wiped if the power goes.",
           why: "Counters, sessions and locks belong here, not in Postgres.",
           table: {
@@ -680,6 +754,12 @@ SELECT name FROM products WHERE attrs @> '{"wireless": true}';     -- uses the G
 SELECT name, attrs->>'colour' AS colour FROM products WHERE attrs ? 'colour';`,
             },
           ],
+        },
+        {
+          title: "Connect it back: the CTO's answer",
+          analogy: "The spanner, the drill and the magnet, each for its bolt.",
+          why: "Answer per workload, keep one truth, and let the other stores be rebuildable.",
+          body: "'Both, by workload. Postgres is the source of truth for accounts, billing and messages. Redis holds carts and presence because they are ephemeral and need microsecond access. Events stream from Postgres through an outbox into a columnar warehouse for the dashboard. Every derived store can be rebuilt from Postgres, so there is one backup story.'\n\nThat answer shows you know what each store is for, which is what the question was really asking.",
         },
       ],
       realWorld: [

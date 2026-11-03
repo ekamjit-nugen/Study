@@ -7,6 +7,7 @@ export const M04: Module = {
   topics: [
     {
       slug: "indexes",
+      guided: true,
       title: "Indexes: the B-tree you can picture",
       minutes: 22,
       story: "A 1,000-page book with no index: to find 'deadlock' you read every page. With an index at the back: open the index, find 'deadlock → p. 412', open page 412. Three steps, regardless of how thick the book is.",
@@ -24,6 +25,13 @@ export const M04: Module = {
         ["leftmost prefix", "a composite index helps only when the filter starts with its first column"],
       ],
       sections: [
+        {
+          title: "The orders page that got slower every month",
+          analogy: "A phone book sorted by surname then first name: perfect for 'Mehta', useless for 'every Priya'.",
+          why: "The right columns in the wrong order is the most common 'I added an index and nothing changed'.",
+          ask: "'Show my paid orders, newest first, 20 at a time' took 40 ms at launch and 4 seconds a year later. There IS an index on customer_id and another on ordered_at. Why is the query still slow?",
+          body: "Because no single index matches the *shape* of the query. The query filters on customer_id **and** status, then sorts by ordered_at.\n\n| index | can find my orders? | can skip to paid? | already sorted by date? |\n|---|---|---|---|\n| (customer_id) | yes | no, reads all my orders | no, sorts them |\n| (ordered_at) | no, scans by date | no | yes, but all customers |\n| (customer_id, status, ordered_at) | yes | yes | **yes, stops after 20** |\n\nWith the first index the database reads all of this customer's orders, throws away the unpaid ones, sorts the rest, then keeps 20. As the customer's history grows, that work grows with it.\n\nThe third index jumps straight to this customer's paid orders in date order and stops after 20 rows. Forever. Let's build up to why.",
+        },
         {
           title: "Walk the tree",
           analogy: "The index at the back of a book: a few hops from the index page to the exact page, however thick the book is.",
@@ -51,6 +59,7 @@ EXPLAIN QUERY PLAN SELECT * FROM customers WHERE city = 'Mumbai';`,
         },
         {
           title: "Composite indexes: column order is everything",
+          ask: "Your query is `WHERE customer_id = 1 AND status = 'paid' ORDER BY ordered_at DESC`. You can create (ordered_at, customer_id, status) or (customer_id, status, ordered_at). Which lets the database read only the rows it returns, and why?",
           analogy: "A phone book sorted by surname then first name: great for finding Mehta, useless for finding every Priya.",
           why: "The right columns in the wrong order make an index useless.",
           diagram: "compositeIndex",
@@ -71,6 +80,7 @@ SELECT id FROM orders WHERE status = 'paid' AND ordered_at >= '2025-03-01' ORDER
         },
         {
           title: "When the index is ignored",
+          ask: "You add an index on orders(status). `WHERE status = 'paid'` is still a scan. 95% of orders are paid. Was the planner wrong?",
           analogy: "A phone book does not help if you search by middle name, or if 90% of the town has the same surname.",
           why: "You will add indexes that the planner refuses to use unless you know these rules.",
           visual: {"kind": "cards", "items": [{"title": "Low selectivity", "lines": ["95% of rows match", "scan is cheaper than 95% random reads"], "tone": "warn"}, {"title": "Function on the column", "lines": ["LOWER(email), YEAR(date)", "expression index or rewrite"], "tone": "bad"}, {"title": "Wrong column order", "lines": ["index (a, b) but WHERE b = ?", "leftmost prefix rule"], "tone": "bad"}, {"title": "Type mismatch", "lines": ["text column = 98765 (int)", "pass the right type"], "tone": "bad"}, {"title": "Leading wildcard", "lines": ["LIKE '%x'", "trigram / full-text index"], "tone": "bad"}, {"title": "Stale statistics", "lines": ["planner thinks the table is tiny", "ANALYZE"], "tone": "warn"}]},
@@ -111,6 +121,12 @@ SELECT id FROM orders WHERE status = 'paid' AND ordered_at >= '2025-03-01' ORDER
             "Unused indexes are pure cost. Find them with `pg_stat_user_indexes` (idx_scan = 0) and drop them.",
           ],
           tip: "Index what you filter, join and sort by, in the shape your real queries use. Start from the slow query log, not from the schema.",
+        },
+        {
+          title: "Connect it back: the page stays at 40 ms",
+          analogy: "Open the phone book at 'Mehta, Priya' and read the next twenty entries.",
+          why: "Index the query shape: equality first, then the sort column, and the sort step disappears.",
+          body: "```sql\nCREATE INDEX idx_orders_customer_status_date ON orders (customer_id, status, ordered_at DESC);\n```\n\nEXPLAIN now shows an index search with no sort step and no 'rows removed by filter'. The database touches the 20 rows it returns, whether the customer has 30 orders or 30,000.\n\nThe two old single-column indexes may now be unused; check and drop them, because each one taxes every write.",
         },
       ],
       realWorld: [
@@ -169,6 +185,7 @@ EXPLAIN QUERY PLAN SELECT name FROM products WHERE category = 'Books' ORDER BY p
 
     {
       slug: "reading-query-plans",
+      guided: true,
       title: "Reading EXPLAIN: what the database actually did",
       minutes: 18,
       story: "Google Maps shows the route it picked and how long each leg took. EXPLAIN is the route; EXPLAIN ANALYZE is the trip with real times. You fix the slow leg, not the whole trip.",
@@ -186,7 +203,15 @@ EXPLAIN QUERY PLAN SELECT name FROM products WHERE category = 'Books' ORDER BY p
       ],
       sections: [
         {
+          title: "Fast in staging, slow in production",
+          analogy: "A satnav that picked a side street because its traffic data was a year old.",
+          why: "Same code, same schema, same indexes, 1,800× slower: only the plan can tell you why.",
+          ask: "A report runs in 50 ms on staging and 90 seconds in production. Same SQL, same tables, same indexes, same Postgres version. What is different, and where would you look first?",
+          body: "The data, and what the planner *believes* about the data. Staging has 2,000 orders; production has 20 million, and its statistics were last refreshed when it had 2,000.\n\n| | staging | production |\n|---|---|---|\n| rows in orders | 2,000 | 20,000,000 |\n| planner's estimate for the filter | 10 rows | **10 rows** (stale) |\n| plan chosen | nested loop | nested loop |\n| inner side runs | 10 times | **50,000 times** |\n\nThe planner chose a nested loop because it expected 10 matching rows. There were 50,000, so the inner side ran 50,000 times. A hash join would have taken a second.\n\nYou find this by reading the plan: estimated rows next to actual rows. Let's learn to read one.",
+        },
+        {
           title: "What the planner does",
+          ask: "The planner never runs your query before choosing a plan. So what is it comparing when it decides between a sequential scan and an index scan?",
           analogy: "A satnav comparing routes by estimated time and picking the quickest: wrong traffic data, wrong route.",
           why: "Reading plans is how you find out why a query is slow.",
           diagram: "queryPipeline",
@@ -212,6 +237,7 @@ EXPLAIN QUERY PLAN SELECT name FROM products WHERE category = 'Books' ORDER BY p
         },
         {
           title: "Reading a real plan",
+          ask: "A node shows `actual time=0.2..0.3 rows=1 loops=50000`. 0.3 ms looks harmless. How long did that node really take, and what does loops tell you?",
           analogy: "Checking the actual trip against the estimate: where did it take longest, and where was the estimate wrong?",
           why: "The slow node and the wrong estimate point straight at the fix.",
           diagram: "planTree",
@@ -263,6 +289,12 @@ EXPLAIN QUERY PLAN SELECT * FROM products ORDER BY price;`,
           analogy: "A mechanic's checklist: same steps every time, so nothing is missed.",
           why: "A fixed routine beats guessing when a page times out.",
           visual: {"kind": "ladder", "steps": [{"label": "EXPLAIN (ANALYZE, BUFFERS) with real parameters", "tone": "accent"}, {"label": "find the node with the biggest actual time × loops"}, {"label": "Seq Scan + selective filter → index that filter", "tone": "ok"}, {"label": "Sort node → index matching ORDER BY (+ equality filters first)", "tone": "ok"}, {"label": "estimated ≠ actual rows → ANALYZE, extended statistics", "tone": "warn"}, {"label": "Nested Loop with a scanned inner side → index the join column", "tone": "ok"}, {"label": "still slow → fewer columns, keyset pagination, pre-aggregate, cache", "tone": "warn"}]},
+        },
+        {
+          title: "Connect it back: production gets the right plan",
+          analogy: "Update the traffic data and the satnav takes the motorway.",
+          why: "'Estimated vs actual rows' is the first thing to read in any slow plan.",
+          body: "```sql\nANALYZE orders;                                  -- refresh the statistics\nEXPLAIN (ANALYZE, BUFFERS) SELECT …;             -- estimate now ≈ actual, plan becomes a hash join\n```\n\nThe query drops from 90 seconds to under one. If two filtered columns are correlated, add `CREATE STATISTICS` so the planner stops multiplying their selectivities. And make sure autovacuum keeps analysing, so production never drifts this far again.",
         },
       ],
       realWorld: [
@@ -321,6 +353,7 @@ EXPLAIN (ANALYZE, BUFFERS) SELECT ...;`,
 
     {
       slug: "query-antipatterns",
+      guided: true,
       title: "Query anti-patterns that cause 90% of slow pages",
       minutes: 18,
       story: "A courier delivering 100 parcels by driving back to the depot after each one. Nothing is 'wrong' with any single trip; the pattern is the problem. N+1, OFFSET and friends are that courier.",
@@ -337,6 +370,13 @@ EXPLAIN (ANALYZE, BUFFERS) SELECT ...;`,
         ["DataLoader", "a batching layer that turns many single-id lookups into one IN query"],
       ],
       sections: [
+        {
+          title: "Page 5,000 takes eight seconds",
+          analogy: "Finding page 500 of a book by counting pages from the front, every time.",
+          why: "Pagination is in every app, and OFFSET is the default that quietly breaks at scale.",
+          ask: "An admin list of 2 million events pages with `LIMIT 50 OFFSET 250000`. Page 1 is instant; page 5,000 takes 8 seconds and sometimes shows a row twice. The query uses an index and returns only 50 rows. Where do the 8 seconds go?",
+          body: "Into the 250,000 rows the database has to walk past before it can start returning. OFFSET is not a jump; it is 'read and discard this many rows'.\n\n| page | rows read | rows returned |\n|---|---|---|\n| 1 | 50 | 50 |\n| 100 | 5,050 | 50 |\n| 5,000 | **250,050** | 50 |\n\nAnd the duplicates: between two page loads, new events were inserted at the top, so every row shifted down and the boundary moved. Page 5,001 starts with a row you already saw.\n\nA cursor fixes both: 'give me 50 rows after the last one I saw' is a seek, not a count. This topic is a list of habits like OFFSET that look fine and are not.",
+        },
         {
           title: "N+1",
           analogy: "A courier driving back to the depot after every single parcel.",
@@ -364,6 +404,7 @@ const customers = await db.query("SELECT * FROM customers WHERE id = ANY($1)", [
         },
         {
           title: "OFFSET vs keyset pagination",
+          ask: "You replace OFFSET with `WHERE (created_at, id) < (last_seen_at, last_seen_id) ORDER BY created_at DESC, id DESC LIMIT 50`. What does the database do for page 5,000 now, and what can keyset no longer do?",
           analogy: "Finding page 500 of a book by counting pages from the start, versus opening at the bookmark.",
           why: "Deep pages time out and show duplicates without keyset.",
           diagram: "keyset",
@@ -382,6 +423,7 @@ ORDER BY ordered_at DESC, id DESC LIMIT 5;`,
         },
         {
           title: "NOT IN and NULL",
+          ask: "`WHERE id NOT IN (SELECT manager_id FROM employees)` returns zero rows although nine employees are not managers. One manager_id is NULL. Why zero, not nine?",
           analogy: "'Anyone not on this list' when the list has a blank line: you cannot be sure anyone is not on it.",
           why: "NOT IN silently returns nothing when a NULL sneaks in.",
           diagram: "nullLogic",
@@ -426,6 +468,12 @@ SELECT name FROM employees WHERE NOT EXISTS (SELECT 1 FROM employees m WHERE m.m
             "**One statement per row in a loop** for bulk writes: batch VALUES or COPY.",
             "**Opening a transaction and then awaiting an HTTP call:** holds locks and a connection for seconds.",
           ],
+        },
+        {
+          title: "Connect it back: page 5,000 in 2 ms",
+          analogy: "Open the book at the bookmark.",
+          why: "OFFSET is a count; a cursor is a position. Positions are cheap with an index.",
+          body: "```sql\nSELECT id, created_at, type FROM events\nWHERE (created_at, id) < ($1, $2)              -- the last row of the previous page\nORDER BY created_at DESC, id DESC\nLIMIT 50;\n```\n\nwith an index on `(created_at DESC, id DESC)`. The database seeks straight to the cursor and reads 50 rows. Every page costs the same, and inserts at the top no longer shift the boundary. The one thing you give up is 'jump to page 500', which real products rarely need.",
         },
       ],
       realWorld: [
@@ -493,6 +541,7 @@ res.json({ items: page, nextCursor: next });`,
 
     {
       slug: "pooling-caching-app-layer",
+      guided: true,
       title: "Pools, caches and the app layer",
       minutes: 18,
       story: "A restaurant with 10 tables and 100 people outside. You do not build 100 tables; you seat 10, keep a queue, and serve quickly. Connections are the tables, the pool is the host, and a cache is the pre-made dessert.",
@@ -511,7 +560,15 @@ res.json({ items: page, nextCursor: next });`,
       ],
       sections: [
         {
+          title: "The API that fell over at 300 users",
+          analogy: "A restaurant with ten tables, every one occupied by a guest on a long phone call.",
+          why: "'The database is idle but requests time out' confuses teams for days; the cause is almost always this.",
+          ask: "Under load, requests hang for 30 seconds and fail with 'timeout acquiring connection'. The database CPU is at 15%. Adding more app servers makes it worse. What is the scarce resource, and who is holding it?",
+          body: "The scarce resource is **connections**, and the checkout endpoint is holding them: it opens a transaction, inserts the order, then `await`s the payment provider for 2 to 8 seconds, then commits. All that time, its connection is busy doing nothing.\n\n| | per instance | 20 instances |\n|---|---|---|\n| pool size | 10 | 200 connections |\n| checkout holds a connection for | 2–8 s | – |\n| checkouts per second the pool can carry | ~2 | ~40 |\n| requests arriving | – | 300 |\n\nEveryone else queues for a connection that is waiting on an HTTP call. More app servers means more connections, which makes the database slower, not faster.\n\nThe fix is in this topic: pools, timeouts, and never holding a connection across the network.",
+        },
+        {
           title: "Connection pooling",
+          ask: "Postgres max_connections is 100 and you have 5 app servers. Someone sets each pool to 20. What happens when a migration tool and an admin console also connect?",
           analogy: "A restaurant with ten tables: seat ten, keep a queue, and serve fast. Building a hundred tables makes the kitchen slower.",
           why: "Pool mistakes cause the 'database is idle but the app is down' outage.",
           diagram: "pool",
@@ -554,6 +611,7 @@ export async function transfer(from: number, to: number, amount: number) {
         },
         {
           title: "Caching with Redis",
+          ask: "You cache a product in Redis for 60 seconds. Marketing changes the price. What should the write path do with the cached copy: update it, or delete it, and why?",
           analogy: "Keeping today's specials on a chalkboard instead of asking the kitchen every time.",
           why: "Caching is the cheapest speed-up and the easiest way to serve stale data.",
           diagram: "cacheAside",
@@ -613,6 +671,12 @@ async function updateProduct(id: number, patch) {
             "Migrations from the ORM are fine for small tables; for big tables, write the SQL by hand (expand/contract).",
             "Raw SQL for reports and windows; the ORM for CRUD. Both parameterise.",
           ],
+        },
+        {
+          title: "Connect it back: the API at 300 users",
+          analogy: "Guests take their phone calls outside; the tables turn over in minutes.",
+          why: "Hold connections for milliseconds, fail fast when the pool is empty, and the same database serves ten times the load.",
+          body: "1. Move the payment call out of the transaction: create the order as 'pending' in a short transaction, call the provider with the order id as idempotency key, record the result in another short transaction.\n2. Set `connectionTimeoutMillis` so overload fails fast with a 503 instead of piling up, and `statement_timeout` so no query can hog a connection.\n3. Put PgBouncer in transaction mode in front of the 20 instances so they share a small real pool.\n\nConnections are now held for milliseconds, and the database that was idle at 15% CPU is finally allowed to work.",
         },
       ],
       realWorld: [

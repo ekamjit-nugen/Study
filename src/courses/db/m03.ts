@@ -7,6 +7,7 @@ export const M03: Module = {
   topics: [
     {
       slug: "normalization",
+      guided: true,
       title: "Normalisation: one fact, one place",
       minutes: 16,
       story: "Your address written on 40 different letters. You move house, update 38 of them, and two parcels still go to the old place. Normalisation is writing your address once and having every letter point at it.",
@@ -24,6 +25,13 @@ export const M03: Module = {
       ],
       sections: [
         {
+          title: "The customer who moved house",
+          analogy: "Your address written on 40 letters; you move, and two parcels still go to the old place.",
+          why: "Duplication is how a database starts contradicting itself without anyone writing a bug.",
+          ask: "Aarav's city is stored on every one of his 40 order rows. He moves from Mumbai to Pune. The support agent updates 'his orders' with `UPDATE orders SET city = 'Pune' WHERE customer = 'Aarav' AND status = 'pending'`. A week later, which city does the invoice for an old order show, and which does the shipping label for a new one show?",
+          body: "Two different cities, and both queries are 'correct'.\n\n| order | status | city after the update |\n|---|---|---|\n| 12 (old, shipped) | shipped | Mumbai |\n| 38 (pending) | pending | Pune |\n| 41 (new, created later by code that copies from order 12) | pending | **Mumbai** |\n\nThe database now holds two answers to 'where does Aarav live', and every query picks one. Nobody can say which is right.\n\nThe fact 'Aarav lives in Pune' should exist **once**, in one row of one table, and everything else should point at it. Making that true is called normalisation, and it has three steps you can check mechanically.",
+        },
+        {
           title: "From one messy table to three clean ones",
           analogy: "Your address written on 40 letters: move house and you must fix all 40. Write it once in an address book and point the letters at it.",
           why: "Duplication is how databases drift into contradicting themselves.",
@@ -36,6 +44,7 @@ export const M03: Module = {
         },
         {
           title: "The three normal forms, in plain words",
+          ask: "A table order_items(order_id, product_id, qty, product_name). The key is (order_id, product_id). Which column depends on only part of the key, and what goes wrong because of it?",
           analogy: "Tidying a kitchen: no two things in one jar (1NF), each shelf holds only what belongs to it (2NF), nothing stored in a place that depends on something else (3NF).",
           why: "Normal forms are the checklist interviewers use to ask 'what is wrong with this table'.",
           diagram: "normalForms",
@@ -81,6 +90,7 @@ FROM n_orders o JOIN n_customers c ON c.id = o.customer_id JOIN n_products p ON 
         },
         {
           title: "When to denormalise (on purpose)",
+          ask: "You normalise prices into products. Marketing raises the lamp price. What now happens to every old invoice that reads the price through the join, and is that what the customer agreed to?",
           analogy: "A receipt keeps the price you paid even if the shelf price changes tomorrow. That copy is deliberate.",
           why: "Normalising history breaks invoices; copying current facts breaks consistency. Know which is which.",
           visual: {"kind": "compare", "left": {"title": "Current fact → normalise", "lines": ["product's price today", "customer's city", "lives in ONE row; read through the FK"]}, "right": {"title": "Historical fact → snapshot", "lines": ["price the customer agreed to pay", "address the parcel went to", "copied at the moment it happened; never updated"]}, "caption": "Both are correct. The question is which kind of fact you are storing."},
@@ -94,6 +104,12 @@ FROM n_orders o JOIN n_customers c ON c.id = o.customer_id JOIN n_products p ON 
             ],
           },
           warn: "Our order_items.unit_price is denormalised on purpose. The product's price can change tomorrow; the invoice must not.",
+        },
+        {
+          title: "Connect it back: one row to update",
+          analogy: "One address book, forty letters pointing at it.",
+          why: "You can now explain anomalies with one concrete story instead of definitions.",
+          body: "With `customers(id, name, city)` and `orders(id, customer_id, …)`:\n\n```sql\nUPDATE customers SET city = 'Pune' WHERE id = 1;   -- one row\n```\n\nEvery order, old and new, now reads Pune through the join, because there is one fact in one place.\n\nAnd the one case where you *want* a copy: the price on an invoice. That is a historical fact, copied on purpose at order time and never updated. Normalise current facts; snapshot historical ones.",
         },
       ],
       realWorld: [
@@ -152,6 +168,7 @@ HAVING COUNT(DISTINCT oi.unit_price) > 1;`,
 
     {
       slug: "real-world-schema-patterns",
+      guided: true,
       title: "Schema patterns real products use",
       minutes: 22,
       story: "Every city has the same parts: roads, addresses, a postal system. You do not invent them per city. Schemas have the same recurring parts: soft deletes, audit trails, tenants, status machines, trees.",
@@ -169,6 +186,13 @@ HAVING COUNT(DISTINCT oi.unit_price) > 1;`,
         ["closure table", "a table storing every ancestor-descendant pair of a tree"],
       ],
       sections: [
+        {
+          title: "The user who could not come back",
+          analogy: "The recycle bin: the file is out of the way, but its name is still 'taken'.",
+          why: "Soft delete is in almost every product, and this is the first thing it breaks.",
+          ask: "Priya deletes her account. You keep the row for history and set `deleted_at`. Six months later she signs up again with the same email. The customers table has `email UNIQUE`. What does the sign-up see?",
+          body: "A unique-constraint error: `priya@example.com` already exists. From Priya's point of view the app says 'this email is taken' for an account she deleted.\n\n| row | email | deleted_at | counts for UNIQUE? |\n|---|---|---|---|\n| old | priya@example.com | 2025-01-10 | **yes** (the problem) |\n| new | priya@example.com | NULL | refused |\n\nHard-deleting the old row would fix sign-up but lose her order history. The real fix is a uniqueness rule that only looks at **live** rows.\n\nSoft delete is one of a handful of patterns almost every product needs. Each has one trap like this. Let's go through them.",
+        },
         {
           title: "Multi-tenant SaaS",
           analogy: "An apartment building: shared walls and plumbing, but every flat has a number on every key, letter and bill.",
@@ -197,6 +221,7 @@ CREATE INDEX ON projects (tenant_id, created_at DESC);  -- every hot index leads
         },
         {
           title: "Soft delete done right",
+          ask: "You add `deleted_at`. Which other things in the schema and in every query now have to change, beyond the column itself?",
           analogy: "Moving a file to the recycle bin instead of shredding it: it is out of the way but can be restored, and its name is free to reuse.",
           why: "Hard deletes lose history; naive soft deletes block re-registration and leak into reports.",
           visual: {"kind": "ladder", "steps": [{"label": "ADD COLUMN deleted_at timestamptz", "sub": "NULL = live"}, {"label": "partial UNIQUE index … WHERE deleted_at IS NULL", "sub": "a deleted user can sign up again", "tone": "ok"}, {"label": "partial index for live rows", "sub": "small and fast for 99% of queries", "tone": "ok"}, {"label": "default filter in a view or ORM scope", "sub": "so nobody forgets WHERE deleted_at IS NULL", "tone": "warn"}]},
@@ -214,6 +239,7 @@ CREATE INDEX customers_live ON customers (tenant_id) WHERE deleted_at IS NULL;`,
         },
         {
           title: "Status fields and state machines",
+          ask: "Two workers both try to move order 3 from 'paid' to 'shipped' at the same moment. Both run `UPDATE orders SET status = 'shipped' WHERE id = 3`. How many shipments get created, and what one extra condition stops the second?",
           analogy: "A parcel tracking page: pending → paid → shipped. It cannot jump from pending to shipped, and only one person can move it at a time.",
           why: "Unguarded status updates let two workers ship the same order.",
           diagram: "stateMachine",
@@ -270,6 +296,12 @@ SELECT changes() AS rows_moved;   -- 1 = we moved it, 0 = it was not in 'paid'`,
             "**Settings:** JSONB with a documented shape, or a key/value table when you must query by key.",
             "**Timestamps:** `created_at`, `updated_at` on everything; it costs nothing and saves you later.",
           ],
+        },
+        {
+          title: "Connect it back: Priya signs up again",
+          analogy: "The name is free the moment the file is in the bin.",
+          why: "A partial unique index is the pattern; the same shape solves 'unique among active things' everywhere.",
+          body: "```sql\nDROP INDEX customers_email;\nCREATE UNIQUE INDEX customers_email_live ON customers (lower(email)) WHERE deleted_at IS NULL;\n```\n\nUniqueness now applies to live rows only. Priya's old row keeps her history; her new sign-up succeeds; two *live* accounts with the same email are still refused.\n\nEvery pattern in this topic is like that: a small, deliberate rule in the schema that makes a whole class of bugs impossible.",
         },
       ],
       realWorld: [
@@ -334,6 +366,7 @@ ALTER TABLE bookings ADD CONSTRAINT no_double_booking
 
     {
       slug: "ids-and-migrations",
+      guided: true,
       title: "IDs, migrations and zero-downtime schema changes",
       minutes: 16,
       story: "Changing the tyres on a moving car. You cannot stop the car (the app), so you add the new wheel beside the old one, shift the weight over, then remove the old one. That is expand, migrate, contract.",
@@ -350,6 +383,13 @@ ALTER TABLE bookings ADD CONSTRAINT no_double_booking
         ["lock", "the database stopping other sessions from touching a table while it changes"],
       ],
       sections: [
+        {
+          title: "The rename that took the site down for a minute",
+          analogy: "Changing the tyres on a moving car.",
+          why: "Every schema change on a live system has to survive old and new code running at the same time.",
+          ask: "You rename `users.fullname` to `users.display_name` in one migration and deploy. The deploy is rolling: for about a minute, half the servers run old code and half run new code. What do the old servers' queries do during that minute?",
+          body: "They fail. Old code still runs `SELECT fullname …`, and the column no longer exists. Every request that hits an old server returns an error until that server is replaced.\n\n| moment | schema | old servers | new servers |\n|---|---|---|---|\n| before deploy | fullname | OK | – |\n| migration runs | display_name | **error** | OK |\n| rollout finishes | display_name | – | OK |\n\nA rollback makes it worse: the new column is there, the old code is back, and now *every* server fails.\n\nThe rule: each release must work with the schema before it **and** after it. That is done in three steps, expand → migrate → contract, which we will build now.",
+        },
         {
           title: "Migrations as code",
           analogy: "Renovation plans filed with the council: every change written down, numbered, applied in order on every site.",
@@ -378,6 +418,7 @@ export async function down(db) {
         },
         {
           title: "What locks and what does not (Postgres)",
+          ask: "Adding a nullable column is instant. Adding a NOT NULL column without a default on a 500M-row table is not. What does the database have to do in the second case that it skips in the first?",
           analogy: "Changing a sign on a shop door takes a second; rebuilding the shelves closes the shop for hours. Know which change is which.",
           why: "A 'tiny' migration can freeze production for minutes.",
           visual: {"kind": "compare", "left": {"title": "✓ Metadata only (safe)", "lines": ["ADD COLUMN nullable / with constant DEFAULT", "DROP COLUMN (after code stops reading it)", "ADD CONSTRAINT … NOT VALID"]}, "right": {"title": "✗ Rewrites or locks (dangerous on big tables)", "lines": ["ADD COLUMN NOT NULL without default (old PG)", "ALTER COLUMN TYPE", "plain CREATE INDEX (blocks writes)", "ADD FOREIGN KEY without NOT VALID"]}, "caption": "Even a fast DDL waits for an exclusive lock, and every query queues behind it. Set lock_timeout."},
@@ -397,6 +438,7 @@ export async function down(db) {
         },
         {
           title: "Expand, migrate, contract",
+          ask: "You cannot rename in one step. What is the first thing you add, and what must the application do with both columns while the old one still exists?",
           analogy: "Changing tyres on a moving car: fit the new wheel beside the old one, shift the weight, then remove the old one.",
           why: "Renaming in one step breaks the code that is still running.",
           diagram: "expandContract",
@@ -436,6 +478,12 @@ ALTER TABLE users DROP COLUMN fullname;`,
               ["Composite PK for join tables?", "Yes: (left_id, right_id). Add a surrogate only if other tables must reference the pair."],
             ],
           },
+        },
+        {
+          title: "Connect it back: the rename, done in three releases",
+          analogy: "Fit the new wheel beside the old one, shift the weight, then remove the old one.",
+          why: "This is the answer to any 'zero-downtime schema change' question.",
+          body: "1. **Expand** (release 1): `ADD COLUMN display_name`; the app writes both columns, reads the old one; backfill in batches.\n2. **Migrate** (release 2): the app reads the new column, still writes both; `SET NOT NULL` once backfilled.\n3. **Contract** (release 3): the app stops writing the old column; `DROP COLUMN fullname`.\n\nAt every moment, both the previous and the next release work against the schema, so a rolling deploy and a rollback are both safe.",
         },
       ],
       realWorld: [
