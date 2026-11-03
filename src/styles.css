@@ -277,6 +277,10 @@ details.more > div { margin-top: 0.5rem; padding: 0.6rem 0.9rem; border-left: 3p
 .step .tldr-cards .vbox { font-size: 1rem; }
 @media (max-width: 900px) { .step { padding: 1rem; min-height: 40vh; } .step-title { font-size: 1.3rem; } }
 .interview-bank .tapcards { grid-template-columns: 1fr; }
+/* interview questions read as one full-width card each, never side by side */
+.interview .tapcards { grid-template-columns: 1fr; }
+.interview .tapcard { font-size: 1rem; padding: 0.85rem 1rem; }
+.interview .tapcard .a { font-size: 0.98rem; }
 
 /* quizzes, continue card, course path */
 .quiz-options { display: grid; gap: 0.5rem; margin: 0.4rem 0 0.8rem; }
