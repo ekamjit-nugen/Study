@@ -330,7 +330,7 @@ ORDER BY c.country, month;`,
           title: "Connect it back: March is back on the chart",
           analogy: "Draw the calendar first, then write the sales into each box; empty boxes stay as 0.",
           why: "This is the shape of every report that must include empty periods or categories.",
-          body: "The query cannot invent March, so we give it March: build the list of months first (a recursive CTE here, `generate_series` in Postgres), then LEFT JOIN the revenue onto that list and COALESCE the NULL to 0.\n\n```sql\nWITH RECURSIVE months(m) AS (… '2025-01' … '2025-06' …),\nrev AS (SELECT strftime('%Y-%m', ordered_at) AS m, SUM(…) AS revenue FROM … GROUP BY m)\nSELECT months.m, COALESCE(rev.revenue, 0) FROM months LEFT JOIN rev ON rev.m = months.m;\n```\n\nThe calendar drives the query; the data decorates it. March shows 0 and the chart tells the truth.",
+          body: "The query cannot invent March, so we give it March. Three small steps:\n\n1. **Write the calendar down** as its own little table of rows: `VALUES ('2025-01'), ('2025-02'), …`. Six rows, one per month, no data in them yet.\n2. **Add up revenue per month** in a second named query (`rev`), exactly the GROUP BY you already know.\n3. **LEFT JOIN** the revenue onto the calendar. Every calendar row survives; months with no revenue get NULL, and `COALESCE(revenue, 0)` turns that NULL into 0.\n\n```sql\nWITH months(m) AS (VALUES ('2025-01'), ('2025-02'), ('2025-03'), ('2025-04'), ('2025-05'), ('2025-06')),\nrev AS (SELECT strftime('%Y-%m', ordered_at) AS m, SUM(…) AS revenue FROM … GROUP BY m)\nSELECT months.m, COALESCE(rev.revenue, 0) FROM months LEFT JOIN rev ON rev.m = months.m;\n```\n\nThe calendar drives the query; the data decorates it. March shows 0 and the chart tells the truth.\n\nWriting the months by hand is fine for a fixed report. Topic 2.4 shows how to *generate* the list for any range (a recursive CTE in SQLite, `generate_series` in Postgres); the join and the COALESCE stay exactly the same.",
         },
       ],
       realWorld: [
@@ -339,26 +339,27 @@ ORDER BY c.country, month;`,
           problem: "The dashboard shows a revenue line per month. Months with no orders vanish from the chart instead of showing zero, so the line jumps.",
           whyHard: "GROUP BY can only produce groups for rows that exist. You cannot group rows that are not there, so people try to fix it in JavaScript and get it wrong for year boundaries.",
           steps: [
-            "Generate the list of months you want **first**, as its own row set (a calendar). In Postgres: `generate_series`. In SQLite/MySQL: a recursive CTE.",
+            "Write the list of months you want **first**, as its own row set (a calendar): `WITH months(m) AS (VALUES ('2024-11'), ('2024-12'), …)`. Later (topic 2.4) you will generate it instead of typing it.",
             "LEFT JOIN revenue onto the calendar, not the other way round. The calendar is the driving table, so every month survives.",
             "Aggregate per month and `COALESCE` the NULL sum to 0.",
           ],
-          sql: `WITH RECURSIVE months(m) AS (
-  SELECT '2024-11'
-  UNION ALL
-  SELECT strftime('%Y-%m', date(m || '-01', '+1 month')) FROM months WHERE m < '2025-06'
+          sql: `-- step 1: the calendar, written down (eight rows, one per month)
+WITH months(m) AS (
+  VALUES ('2024-11'), ('2024-12'), ('2025-01'), ('2025-02'), ('2025-03'), ('2025-04'), ('2025-05'), ('2025-06')
 ),
+-- step 2: revenue per month, the GROUP BY you already know
 rev AS (
   SELECT strftime('%Y-%m', o.ordered_at) AS m, SUM(oi.qty * oi.unit_price) AS revenue
   FROM orders o JOIN order_items oi ON oi.order_id = o.id
   WHERE o.status <> 'cancelled'
   GROUP BY m
 )
+-- step 3: calendar on the left, revenue joined on; empty months become 0
 SELECT months.m AS month, COALESCE(rev.revenue, 0) AS revenue
 FROM months
 LEFT JOIN rev ON rev.m = months.m
 ORDER BY months.m;`,
-          takeaway: "When the output must include things that have no rows, build those things first and LEFT JOIN the data onto them.",
+          takeaway: "When the output must include things that have no rows, build those things first (even by typing them) and LEFT JOIN the data onto them.",
         },
       ],
       practice: [
