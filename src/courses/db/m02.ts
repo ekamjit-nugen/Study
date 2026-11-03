@@ -1,5 +1,6 @@
 import type { Module } from "../types";
 import { SELECT_CAST, TALE_SELECT } from "./tale-select";
+import { AGG_CAST, TALE_AGGREGATES } from "./tale-aggregates";
 
 export const M02: Module = {
   id: "sql",
@@ -224,6 +225,8 @@ ORDER BY signed_up DESC;`,
 
     {
       slug: "aggregates-group-by",
+      tale: TALE_AGGREGATES,
+      cast: AGG_CAST,
       guided: true,
       title: "Aggregates, GROUP BY and HAVING",
       minutes: 16,
@@ -389,6 +392,12 @@ ORDER BY months.m;`,
 FROM employees
 GROUP BY dept
 ORDER BY dept;`,
+          lines: [
+            { sql: "SELECT dept, COUNT(*) AS headcount, ROUND(AVG(salary)) AS avg_salary", say: "Per department pile: its name, how many rows, and the average salary rounded to a whole number." },
+            { sql: "FROM employees", say: "The staff table." },
+            { sql: "GROUP BY dept", say: "One pile per department." },
+            { sql: "ORDER BY dept;", say: "Alphabetical." },
+          ],
         },
         {
           q: "Which products were ordered in more than 3 distinct orders? Show product name and the count.",
@@ -400,6 +409,14 @@ JOIN products p ON p.id = oi.product_id
 GROUP BY p.id, p.name
 HAVING COUNT(DISTINCT oi.order_id) > 3
 ORDER BY orders DESC, p.name;`,
+          lines: [
+            { sql: "SELECT p.name, COUNT(DISTINCT oi.order_id) AS orders", say: "Per product pile: the name and how many different orders contain it." },
+            { sql: "FROM order_items oi", say: "Start from item rows." },
+            { sql: "JOIN products p ON p.id = oi.product_id", say: "Look up each item's product to get its name." },
+            { sql: "GROUP BY p.id, p.name", say: "One pile per product." },
+            { sql: "HAVING COUNT(DISTINCT oi.order_id) > 3", say: "Keep piles seen in more than three orders. A pile condition, so HAVING." },
+            { sql: "ORDER BY orders DESC, p.name;", say: "Most orders first." },
+          ],
           starter: `SELECT p.name, COUNT(DISTINCT oi.order_id) AS orders\nFROM order_items oi\nJOIN products p ON ...\nGROUP BY ...\nHAVING ...\nORDER BY orders DESC, p.name;`,
         },
         {

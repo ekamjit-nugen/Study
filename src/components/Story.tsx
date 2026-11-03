@@ -1,6 +1,6 @@
 import { useSyncExternalStore, type ReactNode } from "react";
 import type { Interview, Practice, StoryLine, StoryPage, StoryQuery } from "../courses/types";
-import { TERMS } from "../courses/db/glossary";
+import { termsFor } from "./TermHelp";
 import { inline, Prose } from "../lib/md";
 import { DataTable } from "./Bits";
 import { Diagram } from "./Diagrams";
@@ -80,20 +80,20 @@ export function StoryParagraphs({ text, slug, jargon }: { text: string; slug: st
             defs.push({ label: word, plain: meaning });
           }
         }
-        for (const t of TERMS) {
-          if (t.taughtIn === slug || shown.has(t.id)) continue;
-          if (t.match.test(para)) {
-            shown.add(t.id);
-            defs.push({ label: t.label, plain: t.plain });
-          }
+        // Glossary terms whose lesson comes later than this topic, unless the page defines the word itself.
+        for (const t of termsFor([para], slug)) {
+          if (shown.has(t.id)) continue;
+          if ((jargon ?? []).some(([word]) => t.match.test(word))) continue;
+          shown.add(t.id);
+          defs.push({ label: t.label, plain: t.plain });
         }
         return (
           <div key={i} className="story-para">
             <Prose text={para} />
             {defs.length > 0 && (
               <div className="jargon">
-                {defs.map((d) => (
-                  <div key={d.label} className="jargon-row">
+                {defs.map((d, j) => (
+                  <div key={j + ":" + d.label} className="jargon-row">
                     <b>{d.label}</b> <span className="muted">·</span> {inline(d.plain)}
                   </div>
                 ))}
