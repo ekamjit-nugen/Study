@@ -9,7 +9,7 @@ import { Diagram } from "./Diagrams";
 import SqlRunner from "./SqlRunner";
 import { interviewAnswer, interviewQuestion, interviewTag } from "./InterviewCard";
 import TermHelp from "./TermHelp";
-import { PracticeAnswer, StoryPageView } from "./Story";
+import { PracticeAnswer, STAGE_LABEL, StoryPageView } from "./Story";
 import { Ladder, Visual, splitBullet } from "./Visuals";
 import { QuizCard } from "./QuizCard";
 import { useLastTopic } from "../lib/learner";
@@ -311,6 +311,23 @@ export function buildSteps(topic: Topic, courseId: string, next: Topic | undefin
     lead: topic.story,
     body: (
       <>
+        {(topic.difficulty || topic.objectives || topic.prerequisites) && (
+          <div className="lesson-meta">
+            <div className="row" style={{ gap: "0.4rem" }}>
+              {topic.difficulty && <span className={`pill ${topic.difficulty === "foundation" ? "ok" : topic.difficulty === "intermediate" ? "warn" : "bad"}`}>{topic.difficulty}</span>}
+              <span className="pill muted">{topic.minutes} min</span>
+              {topic.prerequisites?.map((p) => (
+                <a key={p} className="pill muted" href={href.topic(courseId, p)} title="Read this first">↩ {p.replace(/-/g, " ")}</a>
+              ))}
+            </div>
+            {topic.objectives && (
+              <div className="objectives">
+                <div className="side-title" style={{ padding: 0 }}>By the end you can</div>
+                <ul>{topic.objectives.map((o, i) => <li key={i}>{inline(o)}</li>)}</ul>
+              </div>
+            )}
+          </div>
+        )}
         <div className="tldr-cards">
           {topic.tldr.map((t, i) => (
             <Notable key={i} text={t} where="In 30 seconds" block>
@@ -339,7 +356,7 @@ export function buildSteps(topic: Topic, courseId: string, next: Topic | undefin
       steps.push({
         ref: `page-${i + 1}`,
         kind: "idea",
-        label: `Page ${i + 1}`,
+        label: pg.stage ? STAGE_LABEL[pg.stage].split(" · ")[0] : `Page ${i + 1}`,
         title: pg.title,
         body: <StoryPageView page={pg} slug={topic.slug} cast={i === 0 ? topic.cast : undefined} />,
       }),

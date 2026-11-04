@@ -151,8 +151,30 @@ export type StoryQuery = {
  * A page of a story-style topic: a few short paragraphs that read like a scene, then the query it leads to.
  * Any paragraph that contains jargon gets the definition rendered right under it.
  */
+/** The eight steps every lesson follows: Understand → Visualize → Implement → Think → Practice. */
+export type Stage = "problem" | "why" | "concept" | "visual" | "implement" | "compare" | "practice" | "recap";
+
+/** Developer vs database engineer: two approaches to the same job, with the trade-offs spelled out. */
+export type Versus = {
+  beginner: { title: string; code?: string; lang?: CodeExample["lang"]; points: string[] };
+  engineer: { title: string; code?: string; lang?: CodeExample["lang"]; points: string[] };
+  tradeoffs: string[];
+  /** When each approach is the right one. */
+  when: string;
+};
+
+/** The review at the end of a lesson. */
+export type Recap = {
+  remember: string[];
+  mistakes: string[];
+  production: string[];
+  next: string[];
+};
+
 export type StoryPage = {
   title: string;
+  /** Which of the eight lesson steps this page is. */
+  stage?: Stage;
   /** Scene label shown above the title, e.g. "Monday, 9:10 — support desk". */
   when?: string;
   /** Markdown paragraphs separated by blank lines. */
@@ -165,6 +187,8 @@ export type StoryPage = {
   queries?: StoryQuery[];
   /** A question to sit with before turning the page. */
   ask?: string;
+  versus?: Versus;
+  recap?: Recap;
 };
 
 export type Practice = {
@@ -228,6 +252,11 @@ export type Topic = {
   tale?: StoryPage[];
   /** Who is in the story, one line, shown on the first page. */
   cast?: string;
+  difficulty?: "foundation" | "intermediate" | "advanced" | "expert";
+  /** 'By the end you can …' lines. */
+  objectives?: string[];
+  /** Slugs of topics to read first. */
+  prerequisites?: string[];
   practice: Practice[];
   interview: Interview[];
   remember: string[];

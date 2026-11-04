@@ -1,6 +1,7 @@
 import type { Module } from "../types";
 import { SELECT_CAST, TALE_SELECT } from "./tale-select";
 import { AGG_CAST, TALE_AGGREGATES } from "./tale-aggregates";
+import { JOINS_CAST, TALE_JOINS } from "./tale-joins";
 
 export const M02: Module = {
   id: "sql",
@@ -11,6 +12,9 @@ export const M02: Module = {
       slug: "select-filter-sort",
       tale: TALE_SELECT,
       cast: SELECT_CAST,
+      difficulty: "foundation",
+      objectives: ["Write a SELECT with WHERE, ORDER BY and LIMIT for a real request and say in which order the database runs the parts.", "Filter by text, dates, lists and ranges, with AND/OR bracketed correctly.", "Explain why `= NULL` finds nothing and why LIMIT needs ORDER BY.", "Spot a search box that can be injected and fix it with a parameter."],
+      prerequisites: ["what-is-a-database", "tables-keys-relationships"],
       guided: true,
       title: "SELECT, WHERE, ORDER BY, LIMIT: the shape of every read",
       minutes: 14,
@@ -227,6 +231,9 @@ ORDER BY signed_up DESC;`,
       slug: "aggregates-group-by",
       tale: TALE_AGGREGATES,
       cast: AGG_CAST,
+      difficulty: "foundation",
+      objectives: ["Turn a 'how many / how much per …' question into GROUP BY with the right aggregate.", "Place a condition in WHERE or HAVING on purpose, and say why.", "Predict COUNT(*), COUNT(col) and COUNT(DISTINCT col) on a table with NULLs.", "Make a report show 0 for periods with no rows."],
+      prerequisites: ["select-filter-sort"],
       guided: true,
       title: "Aggregates, GROUP BY and HAVING",
       minutes: 16,
@@ -441,6 +448,11 @@ ORDER BY orders DESC, p.name;`,
 
     {
       slug: "joins",
+      tale: TALE_JOINS,
+      cast: JOINS_CAST,
+      difficulty: "foundation",
+      objectives: ["Join two or three tables by their keys and read the FROM clause as a path through the schema.", "Choose JOIN or LEFT JOIN by asking what should happen to rows with no match.", "Put a right-table filter in ON, and write an anti-join two ways.", "Recognise fan-out when a total doubles, and fix it by pre-aggregating."],
+      prerequisites: ["select-filter-sort", "aggregates-group-by"],
       guided: true,
       title: "Joins: every kind, and the fan-out trap",
       minutes: 20,
@@ -659,6 +671,12 @@ FROM products p
 LEFT JOIN order_items oi ON oi.product_id = p.id
 GROUP BY p.id, p.name
 ORDER BY units DESC, p.name;`,
+          lines: [
+            { sql: "FROM products p", say: "Products on the left: the table that must stay complete." },
+            { sql: "LEFT JOIN order_items oi ON oi.product_id = p.id", say: "Attach each product's item rows; an unsold product gets NULL." },
+            { sql: "COALESCE(SUM(oi.qty), 0) AS units", say: "Add up quantities; the Gift Card's NULL sum becomes 0." },
+            { sql: "GROUP BY p.id, p.name", say: "One pile per product." },
+          ],
           starter: `SELECT p.name, COALESCE(SUM(oi.qty), 0) AS units\nFROM products p\n... JOIN order_items oi ON ...\nGROUP BY p.id, p.name\nORDER BY units DESC, p.name;`,
         },
         {
@@ -670,6 +688,10 @@ FROM orders o
 LEFT JOIN payments p ON p.order_id = o.id
 WHERE p.id IS NULL
 ORDER BY o.id;`,
+          lines: [
+            { sql: "LEFT JOIN payments p ON p.order_id = o.id", say: "Attach payments; an unpaid order gets NULL on the payment side." },
+            { sql: "WHERE p.id IS NULL", say: "Keep only the orders where nothing was attached: the anti-join." },
+          ],
         },
         {
           q: "Show each customer's name with the number of distinct product categories they bought from (customers with none should show 0).",
@@ -682,6 +704,12 @@ LEFT JOIN order_items oi ON oi.order_id = o.id
 LEFT JOIN products p     ON p.id = oi.product_id
 GROUP BY c.id, c.name
 ORDER BY categories DESC, c.name;`,
+          lines: [
+            { sql: "LEFT JOIN orders o       ON o.customer_id = c.id", say: "Customers to orders; keep customers with none." },
+            { sql: "LEFT JOIN order_items oi ON oi.order_id = o.id", say: "Orders to their items." },
+            { sql: "LEFT JOIN products p     ON p.id = oi.product_id", say: "Items to products, for the category." },
+            { sql: "COUNT(DISTINCT p.category) AS categories", say: "Different categories per customer pile; all-NULL piles count 0." },
+          ],
         },
       ],
       interview: [

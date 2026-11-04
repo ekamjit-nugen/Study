@@ -8,6 +8,7 @@ export const AGG_CAST = "Still Monday. **Nisha** (support) and **Dev** (develope
 export const TALE_AGGREGATES: StoryPage[] = [
   {
     when: "Monday, 11:00 · the support desk",
+    stage: "problem",
     title: "'How many customers per country?'",
     text: "Nisha's next question sounds like the ones from the last hour, but it is not. 'How many customers do we have per country?'\n\nEvery question so far asked for rows: this customer, those products. This one asks for a number about a pile of rows. Dev explains that the database has to do two things: first sort the thirteen customers into piles, one pile per country, and then count each pile.\n\nIn SQL, 'one pile per country' is GROUP BY country, and 'count each pile' is COUNT(*). The result has one row per pile, not one row per customer.",
     jargon: [["aggregate", "a function that turns many rows into one number: COUNT, SUM, AVG, MIN, MAX"]],
@@ -27,6 +28,7 @@ export const TALE_AGGREGATES: StoryPage[] = [
   },
   {
     when: "11:05 · the whiteboard again",
+    stage: "why",
     title: "Rows become piles",
     text: "Dev draws it next to yesterday's order of clauses. FROM opens the table. WHERE, if there is one, drops rows. Then GROUP BY sweeps the surviving rows into piles. Then SELECT runs once per pile, which is why SELECT can only talk about two kinds of things: the label of the pile (the grouped column) and a number computed from the whole pile (an aggregate).\n\nThat is the rule that catches everyone once. `SELECT name, country, COUNT(*) … GROUP BY country` is refused by Postgres: a country pile holds five different names, and the database will not guess one. Either group by name too, or ask an aggregate about the names.\n\nAggregates can answer more than 'how many'. MIN(signed_up) is the earliest join date in the pile, MAX the latest.",
     jargon: [["grouped column", "a column named in GROUP BY; it has exactly one value per pile, so SELECT may show it"]],
@@ -45,7 +47,21 @@ export const TALE_AGGREGATES: StoryPage[] = [
     ],
   },
   {
+    stage: "concept",
+    when: "11:10",
+    title: "Five aggregates and one rule",
+    text: "Now the names. An aggregate is a function that takes a whole pile of rows and gives back one number. There are five you will use every week: COUNT (how many rows), SUM (add a column up), AVG (its average), MIN and MAX (smallest and largest). GROUP BY decides what a pile is; without it, the whole table is one pile and an aggregate returns a single row.\n\nThe one rule: after GROUP BY, SELECT may show only the pile's labels (the grouped columns) and aggregates. Anything else is ambiguous, and Postgres refuses it.\n\nThe pages that follow put each of these to work on a real request from the shop.",
+    visual: { kind: "cards", items: [
+      { title: "COUNT(*)", lines: ["rows in the pile", "COUNT(col) skips NULLs", "COUNT(DISTINCT col) counts different values"], tone: "accent" },
+      { title: "SUM / AVG", lines: ["add up, or average", "skip NULLs", "SUM of no rows is NULL"], tone: "accent" },
+      { title: "MIN / MAX", lines: ["smallest / largest", "work on dates and text too"], tone: "accent" },
+      { title: "GROUP BY", lines: ["decides what a pile is", "one output row per pile", "SELECT: labels and aggregates only"], tone: "ok" },
+    ] },
+    ask: "'Average order value per customer' is two aggregates deep: a sum per order, then an average per customer. Which pile comes first?",
+  },
+  {
     when: "11:15 · the manager walks past",
+    stage: "implement",
     title: "'And how much did each category earn?'",
     text: "The manager, on her way to a call: 'For the noon meeting I need revenue per product category.'\n\nTwo new things hide in that sentence. Revenue is not stored anywhere; it is quantity times price for each item sold, added up. And the category is not on the order_items table at all, only the product's id number is. To show the category, each item row has to be matched to its product row by id. That matching is a JOIN; the next topic is all about it. For today, read `JOIN products p ON p.id = oi.product_id` as 'look up each item's product'.\n\nOnce every item row carries its product's category, the piles are by category and the aggregate is SUM(qty * unit_price).",
     jargon: [["unit_price", "the price of one unit at the moment it was sold, stored on the item row so old orders do not change when the catalogue price changes"]],
@@ -69,6 +85,7 @@ export const TALE_AGGREGATES: StoryPage[] = [
   },
   {
     when: "11:20",
+    stage: "implement",
     title: "Three counts that look the same and are not",
     text: "'How many orders, and how many different customers placed them?' Nisha asks. Two counts, and the second word matters: different.\n\nCOUNT(*) counts rows. COUNT(customer_id) counts rows where that column is not empty. COUNT(DISTINCT customer_id) counts how many different values there are. On the orders table the first two agree, because every order has a customer. The third is smaller, because Aarav alone placed five.\n\nThe difference between the first two shows up on the staff table. Ten employees; COUNT(manager_id) says nine. Nothing is missing: the CEO's manager_id is NULL, and COUNT of a column skips NULLs. Yesterday's rule again: NULL is 'no value', and aggregates step over it.",
     diagram: "countFamily",
@@ -95,6 +112,7 @@ export const TALE_AGGREGATES: StoryPage[] = [
   },
   {
     when: "11:30",
+    stage: "implement",
     title: "'Customers with three or more orders': a filter on piles",
     text: "Nisha wants to send a thank-you note. 'Everyone with three or more orders. Not counting cancelled ones.'\n\nDev writes `WHERE COUNT(*) >= 3` and the database refuses. The reason is the running order: WHERE runs before the piles exist, so there is nothing to count yet. A condition on a pile needs a different word, HAVING, which runs after GROUP BY.\n\nBoth filters are in this query and they do different jobs. WHERE drops the cancelled orders before they are counted. HAVING drops the piles that end up too small. Row filter first, pile filter after.",
     jargon: [["HAVING", "a condition on a pile, checked after GROUP BY has made the piles; WHERE is a condition on a row, checked before"]],
@@ -117,6 +135,7 @@ export const TALE_AGGREGATES: StoryPage[] = [
   },
   {
     when: "11:40 · the slide for the noon meeting",
+    stage: "implement",
     title: "One column per status: a grid from rows",
     text: "The manager wants a grid: months down the side, order statuses across the top, counts in the cells. The database only knows how to give one row per pile, so a pile per (month, status) would come out as a tall list, not a grid.\n\nThe trick is a pile per month, and inside each pile a separate count per status. `SUM(CASE WHEN status = 'paid' THEN 1 ELSE 0 END)` puts a 1 on each paid row and a 0 on the rest, then adds them: the number of paid orders in the pile. One such expression per status gives one column per status.\n\nCASE is if/else inside SQL; it gets its own page in the toolkit topic. The month comes from strftime, which cuts a date down to year-month so that all of March's orders share one label.",
     queries: [
@@ -137,6 +156,7 @@ export const TALE_AGGREGATES: StoryPage[] = [
   },
   {
     when: "11:50",
+    stage: "implement",
     title: "Two labels per pile: country and month",
     text: "'Can I have that per country as well?' Of course. A pile can have more than one label: GROUP BY country, month makes one pile for every combination that actually occurs, India-January, India-February, UK-January and so on.\n\nThe only thing that changes is that both labels must appear in GROUP BY and may then appear in SELECT. Sorting by the same two columns keeps the output readable.",
     queries: [
@@ -155,6 +175,7 @@ export const TALE_AGGREGATES: StoryPage[] = [
   },
   {
     when: "11:55 · three traps before the meeting",
+    stage: "implement",
     title: "The empty pile, the skipped NULL and the halved number",
     text: "Dev shows Nisha three results that look wrong and are not.\n\nFirst: revenue for an order that does not exist. SUM over zero rows is not 0, it is NULL, because there was nothing to add. A report that must show 0 wraps it: COALESCE(SUM(x), 0), which means 'this, or 0 if it is NULL'.\n\nSecond: averages skip NULLs the same way counts do. AVG(manager_id) is the average over nine people, not ten. If a missing value should count as zero, say so: AVG(COALESCE(x, 0)).\n\nThird: 7 / 2 is 3 in SQL, not 3.5, because two whole numbers divided give a whole number. Multiply by 1.0 first, or the 'share of customers who ordered' comes out as 0.",
     jargon: [["COALESCE", "COALESCE(a, b) gives a, or b when a is NULL: the standard way to turn a missing value into 0 or 'unknown'"]],
@@ -182,6 +203,7 @@ export const TALE_AGGREGATES: StoryPage[] = [
   },
   {
     when: "12:00 · the chart with a missing month",
+    stage: "implement",
     title: "The month that fell off the chart",
     text: "The last slide is monthly revenue from November 2024, and the line jumps straight from October to January. November and December had no orders, so they have no rows, so GROUP BY made no pile for them. A pile cannot be made from nothing.\n\nThe fix is to stop asking the orders table for the months. Write the months down yourself as a tiny table, then attach each month's revenue to it with a LEFT JOIN, which keeps every row of the left table even when nothing matches on the right. Months with no revenue get NULL, and COALESCE turns that into 0.\n\nThree steps, each one you already know: a hand-written list of months, the monthly revenue piles, and a join that keeps the list intact.",
     jargon: [["LEFT JOIN", "like JOIN, but every row of the left table survives even when nothing matches on the right; the right side's columns are NULL for those rows. Taught properly in the next topic."]],
@@ -206,6 +228,28 @@ export const TALE_AGGREGATES: StoryPage[] = [
     ],
   },
   {
+    stage: "compare",
+    when: "11:58 · two ways to build the slide",
+    title: "The dashboard numbers, two ways",
+    text: "The old dashboard code and the new one do the same job: orders per status per month. One of them asks the database thirty questions and adds the answers up in JavaScript. The other asks once.",
+    versus: {
+      beginner: {
+        title: "Count in the application",
+        lang: "ts",
+        code: "const orders = await db.query(\"SELECT * FROM orders\");\nconst grid = {};\nfor (const o of orders.rows) {\n  const month = o.ordered_at.slice(0, 7);\n  grid[month] ??= { paid: 0, shipped: 0, pending: 0, cancelled: 0 };\n  grid[month][o.status] += 1;\n}",
+        points: ["Downloads every order row to count them: fine at 24, fatal at 2 million.", "Every status needs code; a new status needs a deploy.", "Empty months silently vanish, same as GROUP BY, but nobody notices because the loop looks complete."],
+      },
+      engineer: {
+        title: "Count in the database",
+        code: "SELECT strftime('%Y-%m', ordered_at) AS month,\n       SUM(CASE WHEN status = 'paid' THEN 1 ELSE 0 END) AS paid,\n       SUM(CASE WHEN status = 'shipped' THEN 1 ELSE 0 END) AS shipped\nFROM orders\nWHERE ordered_at >= '2025-01-01'\nGROUP BY month\nORDER BY month;",
+        points: ["One pass over the rows inside the database; only six rows travel to the app.", "WHERE narrows the rows before grouping, so an index on ordered_at can help.", "A calendar LEFT JOIN (previous page) makes empty months explicit."],
+      },
+      tradeoffs: ["The SQL version is harder to unit-test in isolation; test it against a seeded database instead.", "A grid with twenty statuses is ugly as SUM(CASE) columns; return (month, status, count) rows and pivot in the UI.", "Both versions get slow on a billion rows; that is when a nightly rollup table (chapter 6) takes over."],
+      when: "Counting in code is acceptable for a handful of rows you already fetched for another reason. Anything called a report, a dashboard or an export is a GROUP BY.",
+    },
+  },
+  {
+    stage: "recap",
     title: "Connect it back: the noon slide",
     text: "Every question since eleven o'clock had the same shape. GROUP BY turns rows into piles. SELECT may show a pile's label and numbers computed from the whole pile: COUNT, SUM, AVG, MIN, MAX. WHERE filters rows before the piles are made; HAVING filters the piles after. COUNT(*) counts rows, COUNT(col) skips NULLs, COUNT(DISTINCT col) counts different values. SUM of nothing is NULL, averages skip NULLs, whole numbers divide into whole numbers. And a pile cannot be made from rows that do not exist, so empty months come from a calendar you write down.\n\nThe slide the manager takes into the meeting is one query: per country, how many customers, how many orders and how much revenue, for countries with more than one customer.",
     queries: [
@@ -224,6 +268,12 @@ export const TALE_AGGREGATES: StoryPage[] = [
         expect: "three rows: India (5 customers, 10 orders), USA and UK, the only countries with more than one customer, biggest revenue first.",
       },
     ],
+    recap: {
+      remember: ["GROUP BY makes piles; aggregates summarise a pile; SELECT shows labels and aggregates only.", "WHERE filters rows before the piles, HAVING filters piles after.", "COUNT(*) rows, COUNT(col) non-NULLs, COUNT(DISTINCT col) different values.", "SUM of nothing is NULL; COALESCE(…, 0). Whole numbers divide into whole numbers."],
+      mistakes: ["A non-grouped column in SELECT (works by accident in SQLite, refused by Postgres).", "Expecting GROUP BY to produce rows for months with no data.", "Putting a pile condition in WHERE, or a row condition in HAVING.", "Dividing two counts and getting 0."],
+      production: ["Every dashboard tile, report and 'per customer' number is a GROUP BY.", "Pivot grids: SUM(CASE WHEN …) or FILTER in Postgres.", "Big tables: pre-aggregate into rollup tables on a schedule (chapter 6)."],
+      next: ["2.3 Joins: columns that live in another table, and why two joins at once double your totals.", "2.5 Window functions: a number from neighbouring rows while keeping every row.", "2.7 The toolkit: CASE, COALESCE and NULL rules in depth."],
+    },
     ask: "Nisha's next question: 'which customers bought both a book and a chair?' Counting piles cannot answer that. What has to happen to the rows first?",
   },
 ];

@@ -480,3 +480,28 @@ a.chip:hover { border-color: var(--accent); color: var(--accent); }
 .storyq-expect { background: var(--note, var(--card2)); border-radius: 10px; padding: 0.5rem 0.8rem; font-size: 0.92rem; margin-top: -0.4rem; }
 .story-ask { background: var(--note, #fff8dc); border-radius: 12px; padding: 0.8rem 1rem; font-size: 1rem; font-weight: 600; margin-top: 1rem; }
 @media (max-width: 640px) { .lbl { grid-template-columns: 1fr; } .lbl-sql { border-bottom: 0; } }
+
+/* ---------------- eight-step lesson pattern ---------------- */
+.story-stage { display: inline-block; font-size: 0.74rem; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; color: var(--accent); background: var(--accent-soft); border-radius: 999px; padding: 0.15rem 0.6rem; margin-bottom: 0.5rem; }
+.lesson-meta { margin-bottom: 0.9rem; }
+.objectives ul { margin: 0.3rem 0 0; padding-left: 1.2rem; }
+.objectives li { margin: 0.15rem 0; }
+.versus { margin: 0.8rem 0 1rem; }
+.versus-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 0.7rem; }
+.versus-col { border: 1px solid var(--line); border-radius: 12px; padding: 0.7rem 0.9rem; background: var(--card); }
+.versus-col.beginner { border-color: color-mix(in srgb, var(--warn) 45%, transparent); }
+.versus-col.engineer { border-color: color-mix(in srgb, var(--ok) 45%, transparent); }
+.versus-title { font-weight: 800; margin-bottom: 0.4rem; }
+.versus-col ul, .versus-trade ul { margin: 0.3rem 0 0; padding-left: 1.1rem; font-size: 0.93rem; }
+.versus-col li, .versus-trade li { margin: 0.2rem 0; }
+.versus-trade { margin-top: 0.7rem; background: var(--card2); border-radius: 12px; padding: 0.7rem 0.9rem; font-size: 0.93rem; }
+.versus-sub { font-size: 0.76rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin: 0.3rem 0 0.2rem; }
+.versus-trade p { margin: 0.2rem 0 0; }
+.recap { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 0.6rem; margin: 0.8rem 0; }
+.recap-block { border-radius: 12px; padding: 0.7rem 0.9rem; border: 1px solid var(--line); background: var(--card); }
+.recap-block.ok { background: var(--ok-soft); border-color: color-mix(in srgb, var(--ok) 35%, transparent); }
+.recap-block.warn { background: var(--warn-soft); border-color: color-mix(in srgb, var(--warn) 35%, transparent); }
+.recap-block.accent { background: var(--accent-soft); border-color: color-mix(in srgb, var(--accent) 35%, transparent); }
+.recap-title { font-size: 0.76rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.3rem; }
+.recap-block ul { margin: 0; padding-left: 1.1rem; font-size: 0.93rem; }
+.recap-block li { margin: 0.2rem 0; }

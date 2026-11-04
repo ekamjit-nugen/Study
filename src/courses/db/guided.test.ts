@@ -19,6 +19,15 @@ describe("guided style on every topic", () => {
             }
           }
           expect(t.tale[t.tale.length - 1].title.startsWith("Connect it back"), t.slug + " connect-back").toBe(true);
+          // the eight-step pattern: problem first, a developer-vs-engineer page, a review at the end
+          expect(t.tale[0].stage, t.slug + " opens with the problem").toBe("problem");
+          expect(t.tale.some((pg) => pg.stage === "why"), t.slug + " why page").toBe(true);
+          expect(t.tale.some((pg) => pg.stage === "compare" && pg.versus), t.slug + " compare page").toBe(true);
+          const last = t.tale[t.tale.length - 1];
+          expect(last.stage === "recap" && last.recap, t.slug + " recap page").toBeTruthy();
+          for (const pg of t.tale) expect(pg.stage, `${t.slug}: ${pg.title} has a stage`).toBeTruthy();
+          expect(t.difficulty, t.slug + " difficulty").toBeTruthy();
+          expect(t.objectives?.length, t.slug + " objectives").toBeGreaterThanOrEqual(3);
           for (const pr of t.practice) if (pr.sql) expect(pr.lines?.length, `${t.slug}: practice '${pr.q}' lines`).toBeGreaterThan(0);
           continue;
         }

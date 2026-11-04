@@ -1,8 +1,8 @@
 import { useSyncExternalStore, type ReactNode } from "react";
-import type { Interview, Practice, StoryLine, StoryPage, StoryQuery } from "../courses/types";
+import type { Interview, Practice, Recap, Stage, StoryLine, StoryPage, StoryQuery, Versus } from "../courses/types";
 import { termsFor } from "./TermHelp";
 import { inline, Prose } from "../lib/md";
-import { DataTable } from "./Bits";
+import { Code, DataTable } from "./Bits";
 import { Diagram } from "./Diagrams";
 import SqlRunner from "./SqlRunner";
 
@@ -123,9 +123,63 @@ export function StoryQueryBox({ q }: { q: StoryQuery }) {
   );
 }
 
+export const STAGE_LABEL: Record<Stage, string> = {
+  problem: "Step 1 · The real-world problem",
+  why: "Step 2 · Why it happens",
+  concept: "Step 3 · The concept, now that you have seen the problem",
+  visual: "Step 4 · See it",
+  implement: "Step 5 · The SQL, line by line",
+  compare: "Step 6 · Developer vs database engineer",
+  practice: "Step 7 · Practice",
+  recap: "Step 8 · Review",
+};
+
+function VersusView({ v }: { v: Versus }) {
+  return (
+    <div className="versus">
+      <div className="versus-cols">
+        <div className="versus-col beginner">
+          <div className="versus-title">🧑‍💻 {v.beginner.title}</div>
+          {v.beginner.code && <Code ex={{ lang: v.beginner.lang ?? "sql", src: v.beginner.code }} />}
+          <ul>{v.beginner.points.map((x, i) => <li key={i}>{inline(x)}</li>)}</ul>
+        </div>
+        <div className="versus-col engineer">
+          <div className="versus-title">🛠️ {v.engineer.title}</div>
+          {v.engineer.code && <Code ex={{ lang: v.engineer.lang ?? "sql", src: v.engineer.code }} />}
+          <ul>{v.engineer.points.map((x, i) => <li key={i}>{inline(x)}</li>)}</ul>
+        </div>
+      </div>
+      <div className="versus-trade">
+        <div className="versus-sub">Trade-offs and failure cases</div>
+        <ul>{v.tradeoffs.map((x, i) => <li key={i}>{inline(x)}</li>)}</ul>
+        <div className="versus-sub">When each one fits</div>
+        <p>{inline(v.when)}</p>
+      </div>
+    </div>
+  );
+}
+
+function RecapView({ r }: { r: Recap }) {
+  const block = (title: string, items: string[], tone: string) => (
+    <div className={`recap-block ${tone}`}>
+      <div className="recap-title">{title}</div>
+      <ul>{items.map((x, i) => <li key={i}>{inline(x)}</li>)}</ul>
+    </div>
+  );
+  return (
+    <div className="recap">
+      {block("Remember", r.remember, "ok")}
+      {block("Common mistakes", r.mistakes, "warn")}
+      {block("Where it shows up in production", r.production, "accent")}
+      {block("Learn next", r.next, "plain")}
+    </div>
+  );
+}
+
 export function StoryPageView({ page, slug, cast }: { page: StoryPage; slug: string; cast?: string }) {
   return (
     <div className="storypage">
+      {page.stage && <div className="story-stage">{STAGE_LABEL[page.stage]}</div>}
       {page.when && <div className="story-when">{page.when}</div>}
       {cast && <div className="story-cast">{inline(cast)}</div>}
       <StoryParagraphs text={page.text} slug={slug} jargon={page.jargon} />
@@ -134,6 +188,8 @@ export function StoryPageView({ page, slug, cast }: { page: StoryPage; slug: str
       {page.queries?.map((q, i) => (
         <StoryQueryBox key={i} q={q} />
       ))}
+      {page.versus && <VersusView v={page.versus} />}
+      {page.recap && <RecapView r={page.recap} />}
       {page.ask && <div className="story-ask">🤔 Before you turn the page: {inline(page.ask)}</div>}
     </div>
   );
