@@ -12,10 +12,10 @@ function NoteRow({ n, onRemove }: { n: Note; onRemove: () => void }) {
         {n.topicTitle && <span className="pill ok">{n.topicTitle}</span>}
         <span className="small muted">· {n.where}</span>
       </div>
-      <div className="note-text">{n.text.startsWith("```") ? <Code ex={{ lang: "sql", src: n.text.replace(/^```\n?|```$/g, "") }} /> : inline(n.text)}</div>
+      <div className="note-text">{n.text.startsWith("```") ? <Code ex={{ lang: "text", src: n.text.replace(/^```\n?|```$/g, "") }} /> : inline(n.text)}</div>
       <div className="row">
         <a className="btn small primary" href={n.href}>
-          ↗ Open {n.topicTitle ? "topic" : "chapter"}
+          ↗ Open lesson
         </a>
         <button className="btn small" onClick={onRemove}>
           remove
@@ -26,7 +26,7 @@ function NoteRow({ n, onRemove }: { n: Note; onRemove: () => void }) {
 }
 
 /** The top bar: always visible, shows the notes count and opens the notes panel. */
-export function NotesBar({ onMenu, onQuickGo }: { onMenu: () => void; onQuickGo: () => void }) {
+export function NotesBar({ onMenu }: { onMenu: () => void }) {
   const { notes, remove } = useNotes();
   const [open, setOpen] = useState(false);
   const box = useRef<HTMLDivElement>(null);
@@ -50,15 +50,12 @@ export function NotesBar({ onMenu, onQuickGo }: { onMenu: () => void; onQuickGo:
   return (
     <div className="notesbar">
       <button className="btn small menu-btn" onClick={onMenu}>
-        ☰ Courses
+        ☰ Path
       </button>
       <a href="#/" className="notesbar-brand">
-        🚀 Full-Stack Mastery
+        🤖 AI Engineer Path
       </a>
       <span style={{ flex: 1 }} />
-      <button className="btn small" onClick={onQuickGo} title="Jump to any topic, idea, chapter, mission or tool (Ctrl/⌘+K)">
-        ⚡ Quick go
-      </button>
       <div className="notes-anchor" ref={box}>
       <button className={`btn small ${open ? "primary" : ""}`} onClick={() => setOpen(!open)} title="Your notes">
         📝 Notes {notes.length > 0 && <span className="count">{notes.length}</span>}
@@ -112,7 +109,7 @@ export function NotesPage() {
   return (
     <div className="content">
       <h1>📝 My notes</h1>
-      <p className="muted">Every line you marked, grouped by chapter. Each one takes you back to where it came from.</p>
+      <p className="muted">Every line you marked, grouped by module. Each one takes you back to where it came from.</p>
       <div className="row" style={{ marginBottom: "0.8rem" }}>
         <input className="search" style={{ margin: 0, flex: 1 }} placeholder="Search notes" value={q} onChange={(e) => setQ(e.target.value)} />
         <button className="btn small" onClick={download} disabled={!notes.length}>
@@ -122,7 +119,7 @@ export function NotesPage() {
           clear all
         </button>
       </div>
-      {groups.size === 0 && <div className="card soft">No notes yet. Open any topic or chapter summary and press 📝 next to a line.</div>}
+      {groups.size === 0 && <div className="card soft">No notes yet. Open any lesson, press and hold a line, and press 📝 Note this.</div>}
       {[...groups.entries()].map(([k, list]) => (
         <div className="card" key={k}>
           <h3>{k}</h3>

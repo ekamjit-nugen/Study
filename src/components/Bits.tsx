@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { inline, Prose } from "../lib/md";
-import type { CodeExample, Table } from "../courses/types";
+import type { CodeDemo as CodeExample, Table } from "../path/types";
 
 export function Tldr({ points }: { points: string[] }) {
   return (
@@ -168,7 +168,7 @@ export function highlightSql(src: string): ReactNode[] {
 }
 
 function highlightTs(src: string): ReactNode[] {
-  const re = /(\/\/.*$|`[^`]*`|'[^']*'|"[^"]*"|\b(?:const|let|var|function|return|await|async|import|from|export|if|else|for|of|in|new|class|extends|try|catch|finally|throw|interface|type|implements|this|null|undefined|true|false|while|switch|case|break|default|typeof|readonly|private|public|constructor|yield)\b|\b\d+(?:\.\d+)?\b)/gm;
+  const re = /(\/\/.*$|#.*$|`[^`]*`|'[^']*'|"[^"]*"|\b(?:const|let|var|function|return|await|async|import|from|export|if|else|for|of|in|new|class|extends|try|catch|finally|throw|interface|type|implements|this|null|undefined|true|false|while|switch|case|break|default|typeof|readonly|private|public|constructor|yield|def|print|lambda|None|True|False|elif|not|and|or|is|pass|with|as|range|zip)\b|\b\d+(?:\.\d+)?\b)/gm;
   const out: ReactNode[] = [];
   let last = 0;
   let m: RegExpExecArray | null;
@@ -176,7 +176,7 @@ function highlightTs(src: string): ReactNode[] {
   while ((m = re.exec(src))) {
     if (m.index > last) out.push(src.slice(last, m.index));
     const t = m[0];
-    const cls = t.startsWith("//") ? "cm" : /^["'`]/.test(t) ? "str" : /^\d/.test(t) ? "num" : "kw";
+    const cls = t.startsWith("//") || t.startsWith("#") ? "cm" : /^["'`]/.test(t) ? "str" : /^\d/.test(t) ? "num" : "kw";
     out.push(
       <span className={cls} key={k++}>
         {t}
@@ -189,7 +189,7 @@ function highlightTs(src: string): ReactNode[] {
 }
 
 export function Code({ ex }: { ex: CodeExample }) {
-  const body = ex.lang === "sql" ? highlightSql(ex.src) : ex.lang === "ts" || ex.lang === "js" ? highlightTs(ex.src) : ex.src;
+  const body = ex.lang === "sql" ? highlightSql(ex.src) : ex.lang === "ts" || ex.lang === "js" || ex.lang === "py" ? highlightTs(ex.src) : ex.src;
   return (
     <div>
       <pre className="code">

@@ -57,7 +57,7 @@ export function noteId(ctx: NoteContext, text: string): string {
 }
 
 /* One shared store, so the top bar, the notes page and every 📝 button see the same list. */
-const KEY = "fsm-notes-v1";
+const KEY = "aip-notes-v1";
 let state: Note[] = (() => {
   try {
     const raw = localStorage.getItem(KEY);

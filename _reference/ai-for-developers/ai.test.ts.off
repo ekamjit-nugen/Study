@@ -1,0 +1,55 @@
+// The AI course: every written lesson follows the story pattern; the map and the glossary agree.
+import { describe, expect, it } from "vitest";
+import { AI_COURSE, AI_SLUGS } from "./index";
+import { AI_TERMS } from "./glossary";
+
+const topics = AI_COURSE.modules.flatMap((m) => m.topics);
+
+describe("AI course", () => {
+  it("has a complete map with unique slugs", () => {
+    expect(AI_SLUGS.length).toBeGreaterThanOrEqual(30);
+    expect(new Set(AI_SLUGS).size).toBe(AI_SLUGS.length);
+  });
+  it("every written lesson follows the eight-step story pattern", () => {
+    expect(topics.length).toBeGreaterThanOrEqual(1);
+    for (const t of topics) {
+      expect(t.tale?.length, t.slug + " pages").toBeGreaterThanOrEqual(6);
+      expect(t.cast, t.slug + " cast").toBeTruthy();
+      expect(t.setting && t.setting.length > 120, t.slug + " setting: what the company does, what product, what exists").toBeTruthy();
+      expect(t.difficulty, t.slug + " difficulty").toBeTruthy();
+      expect(t.objectives?.length, t.slug + " objectives").toBeGreaterThanOrEqual(3);
+      const pages = t.tale!;
+      expect(pages[0].stage).toBe("problem");
+      expect(pages.some((p) => p.stage === "why")).toBe(true);
+      expect(pages.some((p) => p.stage === "compare" && p.versus)).toBe(true);
+      const last = pages[pages.length - 1];
+      expect(last.stage === "recap" && last.recap).toBeTruthy();
+      for (const p of pages) {
+        expect(p.stage, `${t.slug}: ${p.title} stage`).toBeTruthy();
+        expect(p.point && p.point.length > 30, `${t.slug}: ${p.title} says its point first`).toBeTruthy();
+        expect(p.when, `${t.slug}: ${p.title} has a novel-style scene label`).toBeUndefined();
+        expect(p.text.length, `${t.slug}: ${p.title} text`).toBeGreaterThan(80);
+        for (const c of p.codes ?? []) for (const l of c.lines ?? []) expect(c.src.includes(l.sql.trim()), `${t.slug}: line '${l.sql}' not in its code`).toBe(true);
+      }
+      expect(t.practice.length).toBeGreaterThanOrEqual(3);
+      expect(t.interview.length, t.slug + " interview").toBeGreaterThanOrEqual(8);
+      expect(t.interview.filter((q) => q.tricky).length, t.slug + " tricky").toBeGreaterThanOrEqual(2);
+      expect(t.remember.length).toBeGreaterThanOrEqual(3);
+      expect(t.quiz?.length, t.slug + " quick checks").toBeGreaterThanOrEqual(3);
+      expect(t.quiz?.some((q) => q.reason), t.slug + " a reasoned check").toBe(true);
+      for (const q of t.quiz ?? []) {
+        expect(q.whyOptions?.length, `${t.slug}: ${q.q}`).toBe(q.options.length);
+        expect(q.answer).toBeLessThan(q.options.length);
+      }
+      expect(t.words?.length ?? 0).toBeGreaterThanOrEqual(4);
+    }
+  });
+  it("glossary terms point at lessons in the map and have real explanations", () => {
+    const known = new Set(AI_SLUGS);
+    expect(new Set(AI_TERMS.map((t) => t.id)).size).toBe(AI_TERMS.length);
+    for (const t of AI_TERMS) {
+      expect(known.has(t.taughtIn), `${t.id} → ${t.taughtIn}`).toBe(true);
+      expect(t.plain.length, t.id).toBeGreaterThan(40);
+    }
+  });
+});

@@ -1,32 +1,34 @@
-import { COURSES } from "../courses/registry";
-import { useProgress } from "../lib/progress";
+import { useState } from "react";
+import { COUNTS, STAGES, findLesson, findModule, lessonLabel } from "../path";
 import { href, type Route } from "../lib/route";
 import { useStreak, useTextSize } from "../lib/learner";
+import { useTrack } from "../lib/track";
+import { moduleProgress, overall, stageProgress } from "../lib/progressCalc";
 
 export default function Sidebar({ route, open, onClose, theme, setTheme }: { route: Route; open: boolean; onClose: () => void; theme: string; setTheme: (t: string) => void }) {
-  const { isDone } = useProgress();
+  const t = useTrack();
   const streak = useStreak();
   const [size, setSize] = useTextSize();
-  const activeCourse = route.page === "course" || route.page === "topic" ? route.course : "db";
-  const course = COURSES.find((c) => c.id === activeCourse);
-  const total = course ? course.modules.reduce((n, m) => n + m.topics.length, 0) : 0;
-  const doneCount = course ? course.modules.reduce((n, m) => n + m.topics.filter((t) => isDone(`${course.id}/${t.slug}`)).length, 0) : 0;
-  const tools: { label: string; h: string; page: Route["page"] }[] = [
-    { label: "🏗️ Build the shop (project)", h: "#/project", page: "project" },
-    { label: "🧩 Hard problems, made easy", h: "#/hard", page: "hard" },
-    { label: "🎤 Interview bank", h: "#/interview", page: "interview" },
-    { label: "🧪 SQL playground", h: "#/playground", page: "playground" },
-    { label: "📋 SQL cheat sheet", h: "#/cheatsheet", page: "cheatsheet" },
+  const o = overall(t.track);
+  const currentModule = route.page === "module" ? findModule(route.id) : route.page === "lesson" ? (findLesson(route.slug) ? findModule(findLesson(route.slug)!.moduleId) : undefined) : undefined;
+  const currentStageNum = route.page === "stage" ? Number(route.id.slice(1)) : route.page === "project" ? Number(route.stageId.slice(1)) : currentModule?.stageNum;
+  const [openStage, setOpenStage] = useState<number | null>(null);
+  const expanded = openStage ?? currentStageNum ?? 1;
+  const links: { label: string; h: string; page: Route["page"] }[] = [
+    { label: "🏠 The path", h: href.home(), page: "home" },
+    { label: "🔁 Revision and results", h: href.revision(), page: "revision" },
+    { label: "📖 Glossary", h: href.glossary(), page: "glossary" },
+    { label: "📝 Notes", h: href.notes(), page: "notes" },
   ];
   return (
     <>
       {open && <div className="backdrop" onClick={onClose} />}
       <aside className={`sidebar ${open ? "open" : ""}`}>
         <a href={href.home()} className="brand" onClick={onClose} style={{ color: "inherit" }}>
-          <span>🚀</span>
+          <span>🤖</span>
           <span>
-            Full-Stack Mastery
-            <small>hard questions, made easy</small>
+            AI Engineer Path
+            <small>one concept at a time</small>
           </span>
         </a>
         <div className="row" style={{ padding: "0 0.5rem 0.4rem" }}>
@@ -35,63 +37,73 @@ export default function Sidebar({ route, open, onClose, theme, setTheme }: { rou
           </button>
           <button className="btn small" onClick={() => setSize(size - 1)} title="Smaller text">A−</button>
           <button className="btn small" onClick={() => setSize(size + 1)} title="Bigger text">A+</button>
-          <span className="pill warn" title="Days in a row you studied">🔥 {streak}-day streak</span>
-          <span className="pill ok" title="Installed as an app, everything including the SQL engine is cached on your device">📱 works offline</span>
+          <span className="pill warn" title="Days in a row you studied">🔥 {streak}</span>
+          <span className="pill ok" title="Installed as an app, everything is cached on your device">📱 offline</span>
         </div>
         <div className="side-section">
-          <div className="side-title">Courses</div>
-          {COURSES.map((c) => (
-            <a key={c.id} href={href.course(c.id)} className={`side-link ${c.status === "coming" ? "soon" : ""} ${activeCourse === c.id && route.page !== "home" ? "active" : ""}`} onClick={onClose}>
-              <span>{c.emoji}</span> {c.title}
-              {c.status === "coming" ? <span className="tag">next</span> : <span className="tag">ready</span>}
+          {links.map((l) => (
+            <a key={l.h} href={l.h} className={`side-link ${route.page === l.page ? "active" : ""}`} onClick={onClose}>
+              {l.label}
             </a>
           ))}
         </div>
         <div className="side-section">
-          <div className="side-title">Tools</div>
-          {tools.map((t) => (
-            <a key={t.h} href={t.h} className={`side-link ${route.page === t.page || (t.page === "project" && route.page === "mission") ? "active" : ""}`} onClick={onClose}>
-              {t.label}
-            </a>
-          ))}
-        </div>
-        {course && course.status === "ready" && (
-          <div className="side-section">
-            <div className="side-title">
-              {course.title} · {doneCount}/{total} done
-            </div>
-            <div className="progressbar">
-              <div style={{ width: `${total ? (doneCount / total) * 100 : 0}%` }} />
-            </div>
-            <a href={href.quick(course.id)} className={`side-topic summary ${route.page === "quick" ? "active" : ""}`} onClick={onClose}>
-              <span className="num">⚡</span>
-              <span>Quick learn: all topics, short</span>
-            </a>
-            {course.modules.map((m, mi) => (
-              <div key={m.id}>
-                <div className="side-module">
-                  {mi + 1}. {m.title}
-                </div>
-                {m.topics.map((t, ti) => {
-                  const active = route.page === "topic" && route.course === course.id && route.slug === t.slug;
-                  return (
-                    <a key={t.slug} href={href.topic(course.id, t.slug)} className={`side-topic ${active ? "active" : ""}`} onClick={onClose}>
-                      <span className="num">
-                        {mi + 1}.{ti + 1}
-                      </span>
-                      <span>{t.title}</span>
-                      {isDone(`${course.id}/${t.slug}`) && <span className="done">✓</span>}
-                    </a>
-                  );
-                })}
-                <a href={href.chapter(course.id, m.id)} className={`side-topic summary ${route.page === "chapter" && route.moduleId === m.id ? "active" : ""}`} onClick={onClose}>
-                  <span className="num">📋</span>
-                  <span>Chapter summary & practice</span>
-                </a>
-              </div>
-            ))}
+          <div className="side-title">
+            Lessons · {o.lessonsDone}/{o.lessonsWritten} done · {COUNTS.written}/{COUNTS.lessons} written
           </div>
-        )}
+          <div className="progressbar">
+            <div style={{ width: `${o.lessonsWritten ? (o.lessonsDone / o.lessonsWritten) * 100 : 0}%` }} />
+          </div>
+        </div>
+        <div className="side-section">
+          <div className="side-title">Stages</div>
+          {STAGES.map((s) => {
+            const sp = stageProgress(s, t.track);
+            const isOpen = expanded === s.num;
+            return (
+              <div key={s.id}>
+                <button className={`side-stage ${currentStageNum === s.num ? "active" : ""}`} onClick={() => setOpenStage(isOpen ? -1 : s.num)}>
+                  <span className="num">{s.num}</span>
+                  <span className="ttl">{s.title}</span>
+                  <span className="small muted">
+                    {sp.done}/{sp.total}
+                  </span>
+                  <span className="chev">{isOpen ? "▾" : "▸"}</span>
+                </button>
+                {isOpen &&
+                  s.modules.map((m) => {
+                    const mp = moduleProgress(m, t.track);
+                    const active = currentModule?.id === m.id;
+                    return (
+                      <div key={m.id}>
+                        <a href={href.module(m.id)} className={`side-topic ${active ? "active" : ""} ${mp.written === 0 ? "planned" : ""}`} onClick={onClose}>
+                          <span className="num">{m.num}</span>
+                          <span>{m.title}</span>
+                          <span className="small muted">{mp.written ? `${mp.done}/${mp.total}` : "soon"}</span>
+                          {mp.complete && <span className="done">✓</span>}
+                        </a>
+                        {active &&
+                          m.lessons.map((l) => (
+                            <a key={l.slug} href={href.lesson(l.slug)} className={`side-lesson ${route.page === "lesson" && route.slug === l.slug ? "active" : ""} ${l.body ? "" : "planned"}`} onClick={onClose}>
+                              <span className="num">{lessonLabel(l)}</span>
+                              <span>{l.title}</span>
+                              {t.lessonDone(l.slug) && <span className="done">✓</span>}
+                            </a>
+                          ))}
+                      </div>
+                    );
+                  })}
+                {isOpen && (
+                  <a href={href.project(s.id)} className={`side-topic summary ${route.page === "project" && route.stageId === s.id ? "active" : ""}`} onClick={onClose}>
+                    <span className="num">🏗️</span>
+                    <span>Stage project</span>
+                    {sp.projectDone && <span className="done">✓</span>}
+                  </a>
+                )}
+              </div>
+            );
+          })}
+        </div>
       </aside>
     </>
   );
