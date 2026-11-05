@@ -11,9 +11,9 @@ export default defineConfig({
       registerType: "autoUpdate",
       includeAssets: ["apple-touch-icon.png"],
       manifest: {
-        name: "Full-Stack Mastery",
-        short_name: "FS Mastery",
-        description: "Databases, React, Next.js, Node and NestJS taught one idea per screen, with a SQL engine that runs offline.",
+        name: "AI Engineer Path",
+        short_name: "AI Path",
+        description: "The complete AI and AI-engineering learning path, one concept per lesson. Works offline.",
         theme_color: "#2563eb",
         background_color: "#f4f6f9",
         display: "standalone",
@@ -27,7 +27,7 @@ export default defineConfig({
         ],
       },
       workbox: {
-        // Cache everything the app needs, including the 1 MB SQLite WebAssembly engine.
+        // Cache everything the app needs so it works offline.
         globPatterns: ["**/*.{js,css,html,wasm,png,svg,ico,woff2}"],
         maximumFileSizeToCacheInBytes: 6 * 1024 * 1024,
         navigateFallback: "index.html",

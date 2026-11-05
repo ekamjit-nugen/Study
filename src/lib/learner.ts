@@ -5,7 +5,7 @@ import { useLocal } from "./useLocal";
 export type LastTopic = { course: string; slug: string; title: string };
 
 export function useLastTopic() {
-  return useLocal<LastTopic | null>("fsm-last-topic", null);
+  return useLocal<LastTopic | null>("aip-last-topic", null);
 }
 
 function today(): string {
@@ -15,7 +15,7 @@ function today(): string {
 
 /** Records today as a study day and returns the current consecutive-day streak. */
 export function useStreak(): number {
-  const [days, setDays] = useLocal<string[]>("fsm-days", []);
+  const [days, setDays] = useLocal<string[]>("aip-days", []);
   const t = today();
   useEffect(() => {
     if (!days.includes(t)) setDays([...days, t].slice(-400));
@@ -33,7 +33,7 @@ export function useStreak(): number {
 }
 
 export function useTextSize(): [number, (n: number) => void] {
-  const [size, setSize] = useLocal<number>("fsm-font", 16);
+  const [size, setSize] = useLocal<number>("aip-font", 16);
   useEffect(() => {
     document.documentElement.style.fontSize = size + "px";
   }, [size]);

@@ -1,8 +1,8 @@
 {
-  "name": "fullstack-mastery",
+  "name": "ai-engineer-path",
   "private": true,
   "version": "0.1.0",
-  "description": "A visual, topic-wise course that makes the hardest full-stack questions easy: Databases first, then React, Next.js, Node and NestJS.",
+  "description": "The complete AI and AI-engineering learning path: 10 stages, 50 modules, one concept per lesson, from what AI is to production systems and a Punjabi assistant. Works offline.",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -13,13 +13,11 @@
   },
   "dependencies": {
     "react": "19.3.0",
-    "react-dom": "19.3.0",
-    "sql.js": "1.15.2"
+    "react-dom": "19.3.0"
   },
   "devDependencies": {
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
-    "@types/sql.js": "1.4.11",
     "@vitejs/plugin-react": "5.2.0",
     "typescript": "5.9.3",
     "vite": "7.3.6",
